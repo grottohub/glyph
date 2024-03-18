@@ -7,10 +7,10 @@ import gleam/dynamic.{type DecodeErrors, type Dynamic}
 import gleam/list
 import models/api
 
-pub type ApplicationDecoder(app) =
+type ApplicationDecoder(app) =
   fn(Dynamic) -> Result(app, DecodeErrors)
 
-pub fn application(
+fn application(
   constructor: fn(
     id,
     name,
@@ -166,10 +166,45 @@ pub fn application(
   }
 }
 
-pub type UserDecoder(user) =
+pub fn application_decoder() -> ApplicationDecoder(api.Application) {
+  application(
+    api.Application,
+    dynamic.field("id", of: dynamic.string),
+    dynamic.field("name", of: dynamic.string),
+    dynamic.optional_field("icon", of: dynamic.string),
+    dynamic.field("description", of: dynamic.string),
+    dynamic.optional_field("rpc_origins", of: dynamic.list(dynamic.string)),
+    dynamic.field("bot_public", of: dynamic.bool),
+    dynamic.field("bot_require_code_grant", of: dynamic.bool),
+    dynamic.optional_field("bot", of: user_decoder()),
+    dynamic.optional_field("terms_of_service_url", of: dynamic.string),
+    dynamic.optional_field("privacy_policy_url", of: dynamic.string),
+    dynamic.optional_field("owner", of: user_decoder()),
+    dynamic.optional_field("summary", of: dynamic.string),
+    dynamic.field("verify_key", of: dynamic.string),
+    dynamic.optional_field("team", of: team_decoder()),
+    dynamic.optional_field("guild_id", of: dynamic.string),
+    dynamic.optional_field("primary_sku_id", of: dynamic.string),
+    dynamic.optional_field("slug", of: dynamic.string),
+    dynamic.optional_field("cover_image", of: dynamic.string),
+    dynamic.optional_field("flags", of: dynamic.int),
+    dynamic.optional_field("approximate_guild_count", of: dynamic.int),
+    dynamic.optional_field("redirect_uris", of: dynamic.list(dynamic.string)),
+    dynamic.optional_field("interactions_endpoint_url", of: dynamic.string),
+    dynamic.optional_field(
+      "role_connections_verification_url",
+      of: dynamic.string,
+    ),
+    dynamic.optional_field("tags", of: dynamic.list(dynamic.string)),
+    dynamic.optional_field("install_params", of: install_params_decoder()),
+    dynamic.optional_field("custom_install_url", of: dynamic.string),
+  )
+}
+
+type UserDecoder(user) =
   fn(Dynamic) -> Result(user, DecodeErrors)
 
-pub fn user(
+fn user(
   constructor: fn(
     id,
     username,
@@ -254,10 +289,32 @@ pub fn user(
   }
 }
 
-pub type TeamDecoder(team) =
+pub fn user_decoder() -> UserDecoder(api.User) {
+  user(
+    api.User,
+    dynamic.field("id", of: dynamic.string),
+    dynamic.field("username", of: dynamic.string),
+    dynamic.field("discriminator", of: dynamic.string),
+    dynamic.optional_field("global_name", of: dynamic.string),
+    dynamic.optional_field("avatar", of: dynamic.string),
+    dynamic.optional_field("bot", of: dynamic.bool),
+    dynamic.optional_field("system", of: dynamic.bool),
+    dynamic.optional_field("mfa_enabled", of: dynamic.bool),
+    dynamic.optional_field("banner", of: dynamic.string),
+    dynamic.optional_field("accent_color", of: dynamic.int),
+    dynamic.optional_field("locale", of: dynamic.string),
+    dynamic.optional_field("email", of: dynamic.string),
+    dynamic.optional_field("flags", of: dynamic.int),
+    dynamic.optional_field("premium_type", of: dynamic.int),
+    dynamic.optional_field("public_flags", of: dynamic.int),
+    dynamic.optional_field("avatar_decoration", of: dynamic.string),
+  )
+}
+
+type TeamDecoder(team) =
   fn(Dynamic) -> Result(team, DecodeErrors)
 
-pub fn team(
+fn team(
   constructor: fn(id, icon, members, name, owner_user_id) -> api.Team,
   id: TeamDecoder(id),
   icon: TeamDecoder(icon),
@@ -282,10 +339,21 @@ pub fn team(
   }
 }
 
-pub type MemberDecoder(member) =
+pub fn team_decoder() -> TeamDecoder(api.Team) {
+  team(
+    api.Team,
+    dynamic.field("id", of: dynamic.string),
+    dynamic.optional_field("icon", of: dynamic.string),
+    dynamic.field("members", of: dynamic.list(member_decoder())),
+    dynamic.field("name", of: dynamic.string),
+    dynamic.field("owner_user_id", of: dynamic.string),
+  )
+}
+
+type MemberDecoder(member) =
   fn(Dynamic) -> Result(member, DecodeErrors)
 
-pub fn member(
+fn member(
   constructor: fn(membership_state, team_id, user, role) -> api.Member,
   membership_state: MemberDecoder(membership_state),
   team_id: MemberDecoder(team_id),
@@ -308,10 +376,20 @@ pub fn member(
   }
 }
 
-pub type InstallParamsDecoder(install_params) =
+pub fn member_decoder() -> MemberDecoder(api.Member) {
+  member(
+    api.Member,
+    dynamic.field("membership_state", of: dynamic.int),
+    dynamic.field("team_id", of: dynamic.string),
+    dynamic.field("user", of: user_decoder()),
+    dynamic.field("role", of: dynamic.string),
+  )
+}
+
+type InstallParamsDecoder(install_params) =
   fn(Dynamic) -> Result(install_params, DecodeErrors)
 
-pub fn install_params(
+fn install_params(
   constructor: fn(scopes, permissions) -> api.InstallParams,
   scopes: InstallParamsDecoder(scopes),
   permissions: InstallParamsDecoder(permissions),
@@ -322,6 +400,14 @@ pub fn install_params(
       a, b -> Error(list.concat([all_errors(a), all_errors(b)]))
     }
   }
+}
+
+pub fn install_params_decoder() -> InstallParamsDecoder(api.InstallParams) {
+  install_params(
+    api.InstallParams,
+    dynamic.field("scopes", dynamic.list(dynamic.string)),
+    dynamic.field("permissions", dynamic.string),
+  )
 }
 
 fn all_errors(result: Result(a, DecodeErrors)) -> DecodeErrors {
