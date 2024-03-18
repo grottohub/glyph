@@ -11,6 +11,29 @@ I will further document how to use this once I have gotten the basic Bot functio
 gleam add glyph
 ```
 
+```gleam
+import gleam/io
+import glyph/clients/api
+import glyph/network/rest
+import envoy
+
+pub fn main() {
+  let discord_token = case envoy.get("DISCORD_TOKEN") {
+    Ok(token) -> token
+    Error(_) -> ""
+  }
+
+  io.println("DISCORD_TOKEN: " <> discord_token)
+
+  let client =
+    api.APIClient(rest.Bot, discord_token, "https://example.com", "0.0.1")
+
+  client
+  |> api.get_application
+  |> io.debug
+}
+```
+
 Further documentation can be found at <https://hexdocs.pm/gliscord>.
 
 ## Development
