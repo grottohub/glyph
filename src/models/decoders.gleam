@@ -5,7 +5,7 @@
 
 import gleam/dynamic.{type DecodeErrors, type Dynamic}
 import gleam/list
-import models/api
+import models/discord
 
 type ApplicationDecoder(app) =
   fn(Dynamic) -> Result(app, DecodeErrors)
@@ -39,7 +39,7 @@ fn application(
     install_params,
     custom_install_url,
   ) ->
-    api.Application,
+    discord.Application,
   id: ApplicationDecoder(id),
   name: ApplicationDecoder(name),
   icon: ApplicationDecoder(icon),
@@ -68,7 +68,7 @@ fn application(
   tags: ApplicationDecoder(tags),
   install_params: ApplicationDecoder(install_params),
   custom_install_url: ApplicationDecoder(custom_install_url),
-) -> ApplicationDecoder(api.Application) {
+) -> ApplicationDecoder(discord.Application) {
   fn(app: Dynamic) {
     case
       id(app),
@@ -166,9 +166,9 @@ fn application(
   }
 }
 
-pub fn application_decoder() -> ApplicationDecoder(api.Application) {
+pub fn application_decoder() -> ApplicationDecoder(discord.Application) {
   application(
-    api.Application,
+    discord.Application,
     dynamic.field("id", of: dynamic.string),
     dynamic.field("name", of: dynamic.string),
     dynamic.optional_field("icon", of: dynamic.string),
@@ -223,7 +223,7 @@ fn user(
     public_flags,
     avatar_decoration,
   ) ->
-    api.User,
+    discord.User,
   id: UserDecoder(id),
   username: UserDecoder(username),
   discriminator: UserDecoder(discriminator),
@@ -240,7 +240,7 @@ fn user(
   premium_type: UserDecoder(premium_type),
   public_flags: UserDecoder(public_flags),
   avatar_decoration: UserDecoder(avatar_decoration),
-) -> UserDecoder(api.User) {
+) -> UserDecoder(discord.User) {
   fn(user: Dynamic) {
     case
       id(user),
@@ -289,9 +289,9 @@ fn user(
   }
 }
 
-pub fn user_decoder() -> UserDecoder(api.User) {
+pub fn user_decoder() -> UserDecoder(discord.User) {
   user(
-    api.User,
+    discord.User,
     dynamic.field("id", of: dynamic.string),
     dynamic.field("username", of: dynamic.string),
     dynamic.field("discriminator", of: dynamic.string),
@@ -315,13 +315,13 @@ type TeamDecoder(team) =
   fn(Dynamic) -> Result(team, DecodeErrors)
 
 fn team(
-  constructor: fn(id, icon, members, name, owner_user_id) -> api.Team,
+  constructor: fn(id, icon, members, name, owner_user_id) -> discord.Team,
   id: TeamDecoder(id),
   icon: TeamDecoder(icon),
   members: TeamDecoder(members),
   name: TeamDecoder(name),
   owner_user_id: TeamDecoder(owner_user_id),
-) -> TeamDecoder(api.Team) {
+) -> TeamDecoder(discord.Team) {
   fn(team: Dynamic) {
     case id(team), icon(team), members(team), name(team), owner_user_id(team) {
       Ok(a), Ok(b), Ok(c), Ok(d), Ok(e) -> Ok(constructor(a, b, c, d, e))
@@ -339,9 +339,9 @@ fn team(
   }
 }
 
-pub fn team_decoder() -> TeamDecoder(api.Team) {
+pub fn team_decoder() -> TeamDecoder(discord.Team) {
   team(
-    api.Team,
+    discord.Team,
     dynamic.field("id", of: dynamic.string),
     dynamic.optional_field("icon", of: dynamic.string),
     dynamic.field("members", of: dynamic.list(member_decoder())),
@@ -354,12 +354,12 @@ type MemberDecoder(member) =
   fn(Dynamic) -> Result(member, DecodeErrors)
 
 fn member(
-  constructor: fn(membership_state, team_id, user, role) -> api.Member,
+  constructor: fn(membership_state, team_id, user, role) -> discord.Member,
   membership_state: MemberDecoder(membership_state),
   team_id: MemberDecoder(team_id),
   user: MemberDecoder(user),
   role: MemberDecoder(role),
-) -> MemberDecoder(api.Member) {
+) -> MemberDecoder(discord.Member) {
   fn(member: Dynamic) {
     case membership_state(member), team_id(member), user(member), role(member) {
       Ok(a), Ok(b), Ok(c), Ok(d) -> Ok(constructor(a, b, c, d))
@@ -376,9 +376,9 @@ fn member(
   }
 }
 
-pub fn member_decoder() -> MemberDecoder(api.Member) {
+pub fn member_decoder() -> MemberDecoder(discord.Member) {
   member(
-    api.Member,
+    discord.Member,
     dynamic.field("membership_state", of: dynamic.int),
     dynamic.field("team_id", of: dynamic.string),
     dynamic.field("user", of: user_decoder()),
@@ -390,10 +390,10 @@ type InstallParamsDecoder(install_params) =
   fn(Dynamic) -> Result(install_params, DecodeErrors)
 
 fn install_params(
-  constructor: fn(scopes, permissions) -> api.InstallParams,
+  constructor: fn(scopes, permissions) -> discord.InstallParams,
   scopes: InstallParamsDecoder(scopes),
   permissions: InstallParamsDecoder(permissions),
-) -> InstallParamsDecoder(api.InstallParams) {
+) -> InstallParamsDecoder(discord.InstallParams) {
   fn(install_params: Dynamic) {
     case scopes(install_params), permissions(install_params) {
       Ok(a), Ok(b) -> Ok(constructor(a, b))
@@ -402,9 +402,9 @@ fn install_params(
   }
 }
 
-pub fn install_params_decoder() -> InstallParamsDecoder(api.InstallParams) {
+pub fn install_params_decoder() -> InstallParamsDecoder(discord.InstallParams) {
   install_params(
-    api.InstallParams,
+    discord.InstallParams,
     dynamic.field("scopes", dynamic.list(dynamic.string)),
     dynamic.field("permissions", dynamic.string),
   )

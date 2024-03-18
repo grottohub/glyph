@@ -1,5 +1,5 @@
 import gleam/io
-import clients/rest as api
+import clients/api
 import network/rest
 import envoy
 

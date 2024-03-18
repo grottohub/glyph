@@ -1,9 +1,9 @@
-//// This contains the client for communicating with Discord's REST API.
+//// This contains the client for communicating with Discord's REST discord.
 
 import gleam/hackney.{type Error as HackneyError}
 import gleam/json.{type DecodeError}
 import gleam/result
-import models/api
+import models/discord
 import models/decoders
 import network/rest
 
@@ -21,7 +21,7 @@ pub type APIError {
   DecodeError
 }
 
-pub fn get_application(c: Client) -> Result(api.Application, APIError) {
+pub fn get_application(c: Client) -> Result(discord.Application, APIError) {
   use resp <- result.try(
     rest.new()
     |> rest.set_authorization(c.token_type, c.token)
