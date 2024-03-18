@@ -1,5 +1,5 @@
 import gleam/io
-import gleam/result
+import clients/rest as api
 import network/rest
 import envoy
 
@@ -11,7 +11,9 @@ pub fn main() {
 
   io.println("DISCORD_TOKEN: " <> discord_token)
 
-  rest.request("https://example.com", "0.0.1", rest.Bot, discord_token)
-  |> result.map_error(io.debug)
-  |> result.nil_error()
+  let client =
+    api.APIClient(rest.Bot, discord_token, "https://example.com", "0.0.1")
+
+  client
+  |> api.get_application
 }
