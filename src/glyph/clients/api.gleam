@@ -3,9 +3,9 @@
 import gleam/hackney.{type Error as HackneyError}
 import gleam/json.{type DecodeError}
 import gleam/result
-import models/discord
-import models/decoders
-import network/rest
+import glyph/models/discord
+import glyph/models/decoders
+import glyph/network/rest
 
 pub type Client {
   APIClient(

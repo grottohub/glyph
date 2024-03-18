@@ -1,6 +1,6 @@
 import gleam/io
-import clients/api
-import network/rest
+import glyph/clients/api
+import glyph/network/rest
 import envoy
 
 pub fn main() {
@@ -16,4 +16,5 @@ pub fn main() {
 
   client
   |> api.get_application
+  |> io.debug
 }

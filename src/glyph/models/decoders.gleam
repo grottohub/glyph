@@ -5,7 +5,7 @@
 
 import gleam/dynamic.{type DecodeErrors, type Dynamic}
 import gleam/list
-import models/discord
+import glyph/models/discord
 
 type ApplicationDecoder(app) =
   fn(Dynamic) -> Result(app, DecodeErrors)
