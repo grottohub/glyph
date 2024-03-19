@@ -97,3 +97,22 @@ pub type MembershipState {
 pub type InstallParams {
   InstallParams(scopes: List(String), permissions: String)
 }
+
+/// Model for Get Gateway Bot: https://discord.com/developers/docs/topics/gateway#get-gateway-bot
+pub type GetGatewayBot {
+  GetGatewayBot(
+    url: String,
+    shards: Int,
+    session_start_limit: SessionStartLimit,
+  )
+}
+
+/// Model for Session Start Limit Object: https://discord.com/developers/docs/topics/gateway#session-start-limit-object
+pub type SessionStartLimit {
+  SessionStartLimit(
+    total: Int,
+    remaining: Int,
+    reset_after: Int,
+    max_concurrency: Int,
+  )
+}

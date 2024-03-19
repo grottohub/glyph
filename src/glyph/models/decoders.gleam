@@ -410,6 +410,81 @@ pub fn install_params_decoder() -> InstallParamsDecoder(discord.InstallParams) {
   )
 }
 
+type GetGatewayBotDecoder(gateway_bot) =
+  fn(Dynamic) -> Result(gateway_bot, DecodeErrors)
+
+fn get_gateway_bot(
+  constructor: fn(url, shards, session_start_limit) -> discord.GetGatewayBot,
+  url: GetGatewayBotDecoder(url),
+  shards: GetGatewayBotDecoder(shards),
+  session_start_limit: GetGatewayBotDecoder(session_start_limit),
+) -> GetGatewayBotDecoder(discord.GetGatewayBot) {
+  fn(gateway_bot: Dynamic) {
+    case
+      url(gateway_bot),
+      shards(gateway_bot),
+      session_start_limit(gateway_bot)
+    {
+      Ok(a), Ok(b), Ok(c) -> Ok(constructor(a, b, c))
+      a, b, c ->
+        Error(list.concat([all_errors(a), all_errors(b), all_errors(c)]))
+    }
+  }
+}
+
+pub fn get_gateway_bot_decoder() -> GetGatewayBotDecoder(discord.GetGatewayBot) {
+  get_gateway_bot(
+    discord.GetGatewayBot,
+    dynamic.field("url", dynamic.string),
+    dynamic.field("shards", dynamic.int),
+    dynamic.field("session_start_limit", session_start_limit_decoder()),
+  )
+}
+
+type SessionStartLimitDecoder(session_start_limit) =
+  fn(Dynamic) -> Result(session_start_limit, DecodeErrors)
+
+fn session_start_limit(
+  constructor: fn(total, remaining, reset_after, max_concurrency) ->
+    discord.SessionStartLimit,
+  total: SessionStartLimitDecoder(total),
+  remaining: SessionStartLimitDecoder(remaining),
+  reset_after: SessionStartLimitDecoder(reset_after),
+  max_concurrency: SessionStartLimitDecoder(max_concurrency),
+) -> SessionStartLimitDecoder(discord.SessionStartLimit) {
+  fn(session_start_limit: Dynamic) {
+    case
+      total(session_start_limit),
+      remaining(session_start_limit),
+      reset_after(session_start_limit),
+      max_concurrency(session_start_limit)
+    {
+      Ok(a), Ok(b), Ok(c), Ok(d) -> Ok(constructor(a, b, c, d))
+      a, b, c, d ->
+        Error(
+          list.concat([
+            all_errors(a),
+            all_errors(b),
+            all_errors(c),
+            all_errors(d),
+          ]),
+        )
+    }
+  }
+}
+
+pub fn session_start_limit_decoder() -> SessionStartLimitDecoder(
+  discord.SessionStartLimit,
+) {
+  session_start_limit(
+    discord.SessionStartLimit,
+    dynamic.field("total", dynamic.int),
+    dynamic.field("remaining", dynamic.int),
+    dynamic.field("reset_after", dynamic.int),
+    dynamic.field("max_concurrency", dynamic.int),
+  )
+}
+
 fn all_errors(result: Result(a, DecodeErrors)) -> DecodeErrors {
   case result {
     Ok(_) -> []

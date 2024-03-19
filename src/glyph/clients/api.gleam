@@ -1,4 +1,4 @@
-//// This contains the client for communicating with Discord's REST discord.
+//// This contains the client for communicating with Discord's REST API.
 
 import gleam/hackney.{type Error as HackneyError}
 import gleam/json.{type DecodeError}
@@ -7,7 +7,7 @@ import glyph/models/discord
 import glyph/models/decoders
 import glyph/network/rest
 
-pub type Client {
+pub type APIClient {
   APIClient(
     token_type: rest.TokenType,
     token: String,
@@ -21,7 +21,7 @@ pub type APIError {
   DecodeError
 }
 
-pub fn get_application(c: Client) -> Result(discord.Application, APIError) {
+pub fn get_application(c: APIClient) -> Result(discord.Application, APIError) {
   use resp <- result.try(
     rest.new()
     |> rest.set_authorization(c.token_type, c.token)
@@ -37,4 +37,22 @@ pub fn get_application(c: Client) -> Result(discord.Application, APIError) {
   )
 
   Ok(app)
+}
+
+pub fn get_gateway_bot(c: APIClient) -> Result(discord.GetGatewayBot, APIError) {
+  use resp <- result.try(
+    rest.new()
+    |> rest.set_authorization(c.token_type, c.token)
+    |> rest.set_bot_user_agent(c.client_url, c.client_version)
+    |> rest.get("/gateway/bot")
+    |> result.replace_error(HackneyError),
+  )
+
+  use gateway_info <- result.try(
+    resp.body
+    |> json.decode(using: decoders.get_gateway_bot_decoder())
+    |> result.replace_error(DecodeError),
+  )
+
+  Ok(gateway_info)
 }

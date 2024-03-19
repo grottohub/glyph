@@ -5,7 +5,7 @@ import gleam/http
 import gleam/http/request
 import gleam/http/response
 
-const api_version = "v10"
+pub const api_version = "10"
 
 /// Acceptable values for an Authorization header
 pub type TokenType {
@@ -56,6 +56,6 @@ pub fn get(
 ) -> Result(response.Response(String), HackneyError) {
   r
   |> request.set_method(http.Get)
-  |> request.set_path("/api/" <> api_version <> endpoint)
+  |> request.set_path("/api/v" <> api_version <> endpoint)
   |> hackney.send
 }
