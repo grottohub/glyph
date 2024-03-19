@@ -1,6 +1,7 @@
 //// This contains the client with functions specifically made for Bot users.
 
 import gleam/result
+import gleam/string
 import glyph/clients/api
 import glyph/network/gateway
 import glyph/network/rest
@@ -28,6 +29,7 @@ pub fn test_ws_loop(b: BotClient) {
     |> api.get_gateway_bot
     |> result.map(fn(gw_info) { gw_info.url })
     |> result.unwrap("")
+    |> string.replace(each: "wss", with: "https")
 
   gateway.start_ws_loop(ws_url)
 }

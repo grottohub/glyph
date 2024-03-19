@@ -1,5 +1,6 @@
 //// This contains all types needed to communicate with either the Gateway or REST API.
 
+import gleam/dynamic
 import gleam/option.{type Option}
 
 /// The data structure Discord uses for UUIDs: https://discord.com/developers/docs/reference#snowflakes
@@ -115,4 +116,21 @@ pub type SessionStartLimit {
     reset_after: Int,
     max_concurrency: Int,
   )
+}
+
+/// Structure of payloads between gateway and client: https://discord.com/developers/docs/topics/gateway-events#payload-structure
+pub type GatewayEvent {
+  GatewayEvent(op: Int, d: GatewayData, s: Option(Int), t: Option(String))
+}
+
+// The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
+
+pub type GatewayData {
+  HelloData(HelloEvent)
+  // ...
+}
+
+/// Structure of a Hello event: https://discord.com/developers/docs/topics/gateway#hello-event
+pub type HelloEvent {
+  HelloEvent(heartbeat_interval: Int)
 }

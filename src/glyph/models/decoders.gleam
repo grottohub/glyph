@@ -5,6 +5,7 @@
 
 import gleam/dynamic.{type DecodeErrors, type Dynamic}
 import gleam/list
+import gleam/result
 import glyph/models/discord
 
 type ApplicationDecoder(app) =
@@ -482,6 +483,69 @@ pub fn session_start_limit_decoder() -> SessionStartLimitDecoder(
     dynamic.field("remaining", dynamic.int),
     dynamic.field("reset_after", dynamic.int),
     dynamic.field("max_concurrency", dynamic.int),
+  )
+}
+
+type GatewayEventDecoder(gateway_event) =
+  fn(Dynamic) -> Result(gateway_event, DecodeErrors)
+
+fn gateway_event(
+  constructor: fn(op, d, s, t) -> discord.GatewayEvent,
+  op: GatewayEventDecoder(op),
+  d: GatewayEventDecoder(d),
+  s: GatewayEventDecoder(s),
+  t: GatewayEventDecoder(t),
+) -> GatewayEventDecoder(discord.GatewayEvent) {
+  fn(gateway_event: Dynamic) {
+    case
+      op(gateway_event),
+      d(gateway_event),
+      s(gateway_event),
+      t(gateway_event)
+    {
+      Ok(op), Ok(d), Ok(s), Ok(t) -> Ok(constructor(op, d, s, t))
+      op, d, s, t ->
+        Error(
+          list.concat([
+            all_errors(op),
+            all_errors(d),
+            all_errors(s),
+            all_errors(t),
+          ]),
+        )
+    }
+  }
+}
+
+pub fn gateway_event_decoder() -> GatewayEventDecoder(discord.GatewayEvent) {
+  gateway_event(
+    discord.GatewayEvent,
+    dynamic.field("op", dynamic.int),
+    dynamic.field("d", dynamic.any(of: [dynamic.int, hello_event_decoder()])),
+    dynamic.optional_field("s", dynamic.int),
+    dynamic.optional_field("t", dynamic.string),
+  )
+}
+
+type HelloDecoder(gateway_data) =
+  fn(Dynamic) -> Result(gateway_data, DecodeErrors)
+
+fn hello_event(
+  constructor: fn(d) -> discord.HelloEvent,
+  d: HelloDecoder(d),
+) -> HelloDecoder(discord.HelloEvent) {
+  fn(gateway_data: Dynamic) {
+    case d(gateway_data) {
+      Ok(d) -> Ok(constructor(d))
+      d -> Error(list.concat([all_errors(d)]))
+    }
+  }
+}
+
+pub fn hello_event_decoder() -> HelloDecoder(discord.HelloEvent) {
+  hello_event(
+    discord.HelloEvent,
+    dynamic.field("heartbeat_interval", dynamic.int),
   )
 }
 

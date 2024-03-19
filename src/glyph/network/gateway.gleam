@@ -3,57 +3,77 @@
 import gleam/dynamic
 import gleam/erlang/process
 import gleam/function
+import gleam/json
 import gleam/option.{type Option, None}
 import gleam/http/request
-import gleam/io
 import gleam/otp/actor
 import gleam/result
 import glyph/network/rest
+import glyph/models/decoders
+import glyph/models/discord
 import stratus
 import logging
-
-/// Structure of payloads between gateway and client: https://discord.com/developers/docs/topics/gateway-events#payload-structure
-pub type GatewayEvent {
-  GatewayEvent(
-    op: Int,
-    d: Option(dynamic.Dynamic),
-    s: Option(Int),
-    t: Option(String),
-  )
-}
+import prng/random.{type Generator}
 
 pub type Msg {
   Close
   TimeUpdated(String)
 }
 
-pub fn decode_gateway_event(
-  event_string,
-) -> Result(GatewayEvent, List(dynamic.DecodeError)) {
-  use op_code <- result.try(dynamic.field("op", dynamic.int)(event_string))
+pub type ActorState {
+  ActorState(seq: Option(Int))
+}
 
-  case op_code {
-    _ -> Ok(GatewayEvent(op: 0, d: None, s: None, t: None))
+fn jitter(heartbeat_interval: Float) -> Float {
+  let gen_jitter: Generator(Float) = random.float(0.0, 1.0)
+  random.random_sample(gen_jitter) *. heartbeat_interval
+}
+
+// pub fn extract_float(decoded: Parent) -> Float {
+//   dynamic.field("some_field", dynamic.int)(decoded.nested_field)
+//   |> result.unwrap(or: 0)
+//   |> int.to_float
+// }
+
+pub fn handle_gateway_event(
+  event_string,
+) -> Result(discord.GatewayEvent, json.DecodeError) {
+  use event <- result.try(json.decode(
+    from: event_string,
+    using: decoders.gateway_event_decoder(),
+  ))
+
+  // use number <- result.try(dynamic.element(0, dynamic.int)(data))
+
+  case event.op {
+    10 -> {
+      logging.log(logging.Info, "Received Hello from gateway")
+      use hello_data <- result.try(
+        dynamic.any(of: [decoders.hello_event_decoder()]),
+      )
+      Ok(event)
+    }
+    11 -> {
+      logging.log(logging.Info, "Received Heartbeat ACK from gateway")
+      Ok(event)
+    }
+    _ -> Ok(event)
   }
 }
 
-pub fn start_ws_loop(_url: String) {
+pub fn start_ws_loop(url: String) {
   let assert Ok(req) =
-    request.to(
-      "https://gateway.discord.gg"
-      <> "/?v="
-      <> rest.api_version
-      <> "&encoding=json",
-    )
+    request.to(url <> "/?v=" <> rest.api_version <> "&encoding=json")
 
   let builder =
     stratus.websocket(
       request: req,
-      init: fn() { #(Nil, None) },
+      init: fn() { #(ActorState(seq: None), None) },
       loop: fn(msg, state, conn) {
         case msg {
           stratus.Text(msg) -> {
             logging.log(logging.Debug, "RECV: " <> msg)
+            let _handle = handle_gateway_event(msg)
             actor.continue(state)
           }
           stratus.User(Close) -> {
@@ -61,6 +81,7 @@ pub fn start_ws_loop(_url: String) {
             actor.Stop(process.Normal)
           }
           _ -> {
+            logging.log(logging.Warning, "Reached unexpected case")
             actor.continue(state)
           }
         }
