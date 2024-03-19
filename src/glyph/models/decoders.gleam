@@ -521,30 +521,36 @@ pub fn gateway_event_decoder() -> GatewayEventDecoder(discord.GatewayEvent) {
   gateway_event(
     discord.GatewayEvent,
     dynamic.field("op", dynamic.int),
-    dynamic.field("d", dynamic.any(of: [dynamic.int, hello_event_decoder()])),
+    dynamic.field(
+      "d",
+      dynamic.any([
+        dynamic.decode1(discord.GatewayInt, dynamic.int),
+        hello_event_decoder(),
+      ]),
+    ),
     dynamic.optional_field("s", dynamic.int),
     dynamic.optional_field("t", dynamic.string),
   )
 }
 
-type HelloDecoder(gateway_data) =
-  fn(Dynamic) -> Result(gateway_data, DecodeErrors)
+// type GatewayDataDecoder(gateway_data) =
+//   fn(Dynamic) -> Result(gateway_data, DecodeErrors)
 
-fn hello_event(
-  constructor: fn(d) -> discord.HelloEvent,
-  d: HelloDecoder(d),
-) -> HelloDecoder(discord.HelloEvent) {
-  fn(gateway_data: Dynamic) {
-    case d(gateway_data) {
-      Ok(d) -> Ok(constructor(d))
-      d -> Error(list.concat([all_errors(d)]))
-    }
-  }
-}
+// fn gateway_data(
+//   constructor: fn(d) -> discord.GatewayData,
+//   d: GatewayDataDecoder(d),
+// ) -> GatewayDataDecoder(discord.GatewayData) {
+//   fn(gateway_data: Dynamic) {
+//     case d(gateway_data) {
+//       Ok(d) -> Ok(constructor(d))
+//       d -> Error(list.concat([all_errors(d)]))
+//     }
+//   }
+// }
 
-pub fn hello_event_decoder() -> HelloDecoder(discord.HelloEvent) {
-  hello_event(
-    discord.HelloEvent,
+pub fn hello_event_decoder() {
+  dynamic.decode1(
+    discord.GatewayHello,
     dynamic.field("heartbeat_interval", dynamic.int),
   )
 }

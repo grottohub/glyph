@@ -126,7 +126,8 @@ pub type GatewayEvent {
 // The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
 
 pub type GatewayData {
-  HelloData(HelloEvent)
+  GatewayInt(Int)
+  GatewayHello(HelloEvent)
   // ...
 }
 
