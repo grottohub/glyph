@@ -27,30 +27,10 @@ pub type GatewayError {
   JsonError(json.DecodeError)
   DynError(dynamic.DecodeError)
   DynErrors(dynamic.DecodeErrors)
-  TimeError
 }
 
 pub type ActorState {
   ActorState(seq: Option(Int), heartbeat_in_ms: Int, self: process.Subject(Msg))
-}
-
-fn jitter(heartbeat_interval: Float) -> Int {
-  let gen_jitter: Generator(Float) = random.float(0.0, 1.0)
-  { random.random_sample(gen_jitter) *. heartbeat_interval }
-  |> float.truncate
-}
-
-fn fallback_event() -> discord.GatewayEvent {
-  discord.GatewayEvent(op: -1, d: dynamic.from(""), s: None, t: None)
-}
-
-fn fallback_hello() -> discord.HelloEvent {
-  discord.HelloEvent(heartbeat_interval: -1)
-}
-
-fn heartbeat_json(seq: Option(Int)) -> String {
-  json.object([#("op", json.int(1)), #("d", json.nullable(seq, of: json.int))])
-  |> json.to_string
 }
 
 fn state_to_string(state: ActorState) -> String {
@@ -189,4 +169,29 @@ pub fn start_ws_loop(url: String) {
     |> process.select_forever
 
   logging.log(logging.Debug, "WebSocket process exited")
+}
+
+// Functions for default / fallback objects
+
+fn fallback_event() -> discord.GatewayEvent {
+  discord.GatewayEvent(op: -1, d: dynamic.from(""), s: None, t: None)
+}
+
+fn fallback_hello() -> discord.HelloEvent {
+  discord.HelloEvent(heartbeat_interval: -1)
+}
+
+// JSON payloads to send to the gateway
+
+fn heartbeat_json(seq: Option(Int)) -> String {
+  json.object([#("op", json.int(1)), #("d", json.nullable(seq, of: json.int))])
+  |> json.to_string
+}
+
+// Misc helpers
+
+fn jitter(heartbeat_interval: Float) -> Int {
+  let gen_jitter: Generator(Float) = random.float(0.0, 1.0)
+  { random.random_sample(gen_jitter) *. heartbeat_interval }
+  |> float.truncate
 }
