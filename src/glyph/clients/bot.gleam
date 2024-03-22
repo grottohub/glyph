@@ -31,5 +31,5 @@ pub fn test_ws_loop(b: BotClient) {
     |> result.unwrap("")
     |> string.replace(each: "wss", with: "https")
 
-  gateway.start_ws_loop(ws_url)
+  gateway.start_ws_loop(rest_client.token, ws_url)
 }

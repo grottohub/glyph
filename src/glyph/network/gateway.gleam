@@ -8,6 +8,7 @@ import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/int
+import gleam/io
 import gleam/otp/actor
 import gleam/result
 import glyph/network/rest
@@ -20,6 +21,8 @@ import prng/random.{type Generator}
 pub type Msg {
   Close
   Heartbeat
+  Identify
+  Resume
   TimeUpdated(String)
 }
 
@@ -30,7 +33,12 @@ pub type GatewayError {
 }
 
 pub type ActorState {
-  ActorState(seq: Option(Int), heartbeat_in_ms: Int, self: process.Subject(Msg))
+  ActorState(
+    seq: Option(Int),
+    heartbeat_in_ms: Int,
+    self: process.Subject(Msg),
+    identified: Bool,
+  )
 }
 
 fn state_to_string(state: ActorState) -> String {
@@ -56,11 +64,32 @@ pub fn handle_gateway_recv(
     |> result.unwrap(or: fallback_event())
 
   case event.op {
+    0 -> {
+      logging.log(logging.Info, "Received Ready event from gateway")
+      let ready = decoders.gateway_ready_decoder(event.d)
+
+      case ready {
+        Ok(ev) -> {
+          io.debug(ev)
+          Ok(ActorState(..state, identified: True))
+        }
+        Error(e) -> {
+          logging.log(logging.Error, "Error parsing Ready event")
+          io.debug(e)
+          Ok(state)
+        }
+      }
+    }
     1 -> {
       logging.log(logging.Info, "Received Heartbeat request from gateway")
 
       let _heartbeat =
         stratus.send_text_message(conn, heartbeat_json(state.seq))
+
+      Ok(state)
+    }
+    9 -> {
+      logging.log(logging.Warning, "Received Invalid Session from gateway")
 
       Ok(state)
     }
@@ -71,10 +100,7 @@ pub fn handle_gateway_recv(
         |> result.unwrap(or: fallback_hello())
 
       let jit = jitter(int.to_float(hello.heartbeat_interval))
-      logging.log(
-        logging.Debug,
-        "Sleeping for " <> int.to_string(jit) <> " before sending heartbeat",
-      )
+      logging.log(logging.Debug, "Jitter value: " <> int.to_string(jit))
       process.send_after(state.self, jit, Heartbeat)
 
       Ok(ActorState(..state, heartbeat_in_ms: hello.heartbeat_interval))
@@ -82,20 +108,30 @@ pub fn handle_gateway_recv(
     11 -> {
       logging.log(logging.Info, "Received Heartbeat ACK from gateway")
 
-      Ok(state)
+      case state.identified {
+        True -> Ok(state)
+        False -> {
+          logging.log(logging.Warning, "Not currently identified")
+          process.send(state.self, Identify)
+          Ok(state)
+        }
+      }
     }
     -1 -> {
       logging.log(logging.Warning, "Reached fallback event")
       Ok(state)
     }
-    _ -> {
-      logging.log(logging.Warning, "Received unexpected op code")
+    n -> {
+      logging.log(
+        logging.Warning,
+        "Received unexpected op code " <> int.to_string(n),
+      )
       Ok(state)
     }
   }
 }
 
-pub fn start_ws_loop(url: String) {
+pub fn start_ws_loop(discord_token: String, url: String) {
   let assert Ok(req) =
     request.to(url <> "/?v=" <> rest.api_version <> "&encoding=json")
 
@@ -107,10 +143,18 @@ pub fn start_ws_loop(url: String) {
         let selector =
           process.new_selector()
           |> process.selecting(subj, function.identity)
-        #(ActorState(seq: None, heartbeat_in_ms: 0, self: subj), Some(selector))
+        #(
+          ActorState(
+            seq: None,
+            heartbeat_in_ms: 0,
+            self: subj,
+            identified: False,
+          ),
+          Some(selector),
+        )
       },
       loop: fn(msg, state, conn) {
-        logging.log(logging.Debug, state_to_string(state))
+        // logging.log(logging.Debug, state_to_string(state))
 
         case msg {
           stratus.Text(msg) -> {
@@ -132,6 +176,16 @@ pub fn start_ws_loop(url: String) {
             let _heartbeat =
               stratus.send_text_message(conn, heartbeat_json(state.seq))
             process.send_after(state.self, state.heartbeat_in_ms, Heartbeat)
+            actor.continue(state)
+          }
+          stratus.User(Identify) -> {
+            logging.log(logging.Debug, "Sending Identify")
+            logging.log(logging.Debug, identify_json(discord_token, "linux"))
+            let _identify =
+              stratus.send_text_message(
+                conn,
+                identify_json(discord_token, "linux"),
+              )
             actor.continue(state)
           }
           stratus.User(Close) -> {
@@ -185,6 +239,27 @@ fn fallback_hello() -> discord.HelloEvent {
 
 fn heartbeat_json(seq: Option(Int)) -> String {
   json.object([#("op", json.int(1)), #("d", json.nullable(seq, of: json.int))])
+  |> json.to_string
+}
+
+fn identify_json(token: String, os: String) -> String {
+  let properties =
+    json.object([
+      #("os", json.string(os)),
+      #("browser", json.string("glyph")),
+      #("device", json.string("glyph")),
+    ])
+  json.object([
+    #("op", json.int(2)),
+    #(
+      "d",
+      json.object([
+        #("intents", json.int(7)),
+        #("token", json.string(token)),
+        #("properties", properties),
+      ]),
+    ),
+  ])
   |> json.to_string
 }
 

@@ -129,3 +129,16 @@ pub type GatewayEvent {
 pub type HelloEvent {
   HelloEvent(heartbeat_interval: Int)
 }
+
+/// Structure of a Ready event: https://discord.com/developers/docs/topics/gateway-events#ready-ready-event-fields
+pub type ReadyEvent {
+  ReadyEvent(
+    v: Int,
+    user: User,
+    guilds: dynamic.Dynamic,
+    session_id: String,
+    resume_gateway_url: String,
+    shard: Option(List(Int)),
+    application: Application,
+  )
+}

@@ -535,6 +535,21 @@ pub fn gateway_hello_decoder(
   )(dyn)
 }
 
+pub fn gateway_ready_decoder(
+  dyn: Dynamic,
+) -> Result(discord.ReadyEvent, DecodeErrors) {
+  dynamic.decode7(
+    discord.ReadyEvent,
+    dynamic.field("v", dynamic.int),
+    dynamic.field("user", user_decoder()),
+    dynamic.field("guilds", dynamic.dynamic),
+    dynamic.field("session_id", dynamic.string),
+    dynamic.field("resume_gateway_url", dynamic.string),
+    dynamic.optional_field("shard", dynamic.list(dynamic.int)),
+    dynamic.field("application", application_decoder()),
+  )(dyn)
+}
+
 fn all_errors(result: Result(a, DecodeErrors)) -> DecodeErrors {
   case result {
     Ok(_) -> []
