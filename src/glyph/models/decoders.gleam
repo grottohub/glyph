@@ -5,7 +5,6 @@
 
 import gleam/dynamic.{type DecodeErrors, type Dynamic}
 import gleam/list
-import gleam/result
 import glyph/models/discord
 
 type ApplicationDecoder(app) =
@@ -521,38 +520,19 @@ pub fn gateway_event_decoder() -> GatewayEventDecoder(discord.GatewayEvent) {
   gateway_event(
     discord.GatewayEvent,
     dynamic.field("op", dynamic.int),
-    dynamic.field(
-      "d",
-      dynamic.any([
-        dynamic.decode1(discord.GatewayInt, dynamic.int),
-        hello_event_decoder(),
-      ]),
-    ),
+    dynamic.field("d", dynamic.dynamic),
     dynamic.optional_field("s", dynamic.int),
     dynamic.optional_field("t", dynamic.string),
   )
 }
 
-// type GatewayDataDecoder(gateway_data) =
-//   fn(Dynamic) -> Result(gateway_data, DecodeErrors)
-
-// fn gateway_data(
-//   constructor: fn(d) -> discord.GatewayData,
-//   d: GatewayDataDecoder(d),
-// ) -> GatewayDataDecoder(discord.GatewayData) {
-//   fn(gateway_data: Dynamic) {
-//     case d(gateway_data) {
-//       Ok(d) -> Ok(constructor(d))
-//       d -> Error(list.concat([all_errors(d)]))
-//     }
-//   }
-// }
-
-pub fn hello_event_decoder() {
+pub fn gateway_hello_decoder(
+  dyn: Dynamic,
+) -> Result(discord.HelloEvent, DecodeErrors) {
   dynamic.decode1(
-    discord.GatewayHello,
+    discord.HelloEvent,
     dynamic.field("heartbeat_interval", dynamic.int),
-  )
+  )(dyn)
 }
 
 fn all_errors(result: Result(a, DecodeErrors)) -> DecodeErrors {

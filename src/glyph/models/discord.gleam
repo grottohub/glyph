@@ -120,16 +120,10 @@ pub type SessionStartLimit {
 
 /// Structure of payloads between gateway and client: https://discord.com/developers/docs/topics/gateway-events#payload-structure
 pub type GatewayEvent {
-  GatewayEvent(op: Int, d: GatewayData, s: Option(Int), t: Option(String))
+  GatewayEvent(op: Int, d: dynamic.Dynamic, s: Option(Int), t: Option(String))
 }
 
 // The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
-
-pub type GatewayData {
-  GatewayInt(Int)
-  GatewayHello(HelloEvent)
-  // ...
-}
 
 /// Structure of a Hello event: https://discord.com/developers/docs/topics/gateway#hello-event
 pub type HelloEvent {
