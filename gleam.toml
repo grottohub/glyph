@@ -1,7 +1,7 @@
 name = "glyph"
-version = "0.0.1"
+version = "0.1.0"
 
-description = "A purely Gleam Discord library built from the ground up with stratus (STILL WIP)."
+description = "A purely Gleam Discord library built from the ground up with stratus."
 licences = ["Apache-2.0"]
 repository = { type = "github", user = "grottohub", repo = "glyph" }
 links = [{ title = "Website", href = "https://gleam.run" }]
@@ -12,9 +12,7 @@ gleam = ">= 1.0.0"
 [dependencies]
 gleam_stdlib = "~> 0.34 or ~> 1.0"
 stratus = "~> 0.5"
-envoy = "~> 1.0"
 gleam_hackney = "~> 1.2"
-birl = "~> 1.5"
 gleam_json = "~> 1.0"
 gleam_http = "~> 3.6"
 gleam_otp = "~> 0.10"
