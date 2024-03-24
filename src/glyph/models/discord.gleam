@@ -3,6 +3,9 @@
 import gleam/dynamic
 import gleam/option.{type Option}
 
+/// Generic Discord Error
+pub type DiscordError
+
 /// The data structure Discord uses for UUIDs: https://discord.com/developers/docs/reference#snowflakes
 pub type Snowflake =
   String
@@ -40,6 +43,11 @@ pub type Application {
   )
 }
 
+/// Model for a partial Application received in the Ready event
+pub type ReadyApplication {
+  ReadyApplication(id: Snowflake, flags: Int)
+}
+
 /// Model for a Discord User: https://discord.com/developers/docs/resources/user#user-object
 /// Some additional fields marked as optional here due to the use of partial user objects
 /// in other areas of the API.
@@ -69,6 +77,27 @@ pub type Bot =
 
 pub type Owner =
   User
+
+/// Model for a Message object: https://discord.com/developers/docs/resources/channel#message-object
+/// TODO: add remaining fields
+pub type Message {
+  Message(
+    id: Snowflake,
+    channel_id: Snowflake,
+    author: User,
+    content: String,
+    tts: Bool,
+    mention_everyone: Bool,
+    pinned: Bool,
+    message_type: Int,
+  )
+}
+
+/// Model for the payload when creating a message: https://discord.com/developers/docs/resources/channel#create-message
+/// TODO: add remaining fields
+pub type MessagePayload {
+  MessagePayload(content: String)
+}
 
 /// Model for a Team object: https://discord.com/developers/docs/topics/teams#data-models-team-object
 pub type Team {
@@ -125,6 +154,10 @@ pub type GatewayEvent {
 
 // The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
 
+pub type EventHandler {
+  EventHandler(on_message_create: fn(Message) -> Result(Nil, DiscordError))
+}
+
 /// Structure of a Hello event: https://discord.com/developers/docs/topics/gateway#hello-event
 pub type HelloEvent {
   HelloEvent(heartbeat_interval: Int)
@@ -139,6 +172,29 @@ pub type ReadyEvent {
     session_id: String,
     resume_gateway_url: String,
     shard: Option(List(Int)),
-    application: Application,
+    application: ReadyApplication,
   )
+}
+
+/// The following are gateway intents which represent what events you subscribe to: https://discord.com/developers/docs/topics/gateway#gateway-intents
+pub type GatewayIntent {
+  Guilds
+  GuildMembers
+  GuildModeration
+  GuildEmojisAndStickers
+  GuildIntegrations
+  GuildWebhooks
+  GuildInvites
+  GuildVoiceStates
+  GuildPresences
+  GuildMessages
+  GuildMessageReactions
+  GuildMessageTyping
+  DirectMessages
+  DirectMessageReactions
+  DirectMessageTyping
+  MessageContent
+  GuildScheduledEvents
+  AutoModerationConfiguration
+  AutoModerationExecution
 }

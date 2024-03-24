@@ -44,6 +44,14 @@ pub fn set_authorization(
   )
 }
 
+pub fn set_content_type(
+  r: request.Request(String),
+  content_type: String,
+) -> request.Request(String) {
+  r
+  |> request.set_header("content-type", content_type)
+}
+
 pub fn new() -> request.Request(String) {
   request.new()
   |> request.set_scheme(http.Https)
@@ -57,5 +65,17 @@ pub fn get(
   r
   |> request.set_method(http.Get)
   |> request.set_path("/api/v" <> api_version <> endpoint)
+  |> hackney.send
+}
+
+pub fn post(
+  r: request.Request(String),
+  endpoint: String,
+  body: String,
+) -> Result(response.Response(String), HackneyError) {
+  r
+  |> request.set_method(http.Post)
+  |> request.set_path("/api/v" <> api_version <> endpoint)
+  |> request.set_body(body)
   |> hackney.send
 }

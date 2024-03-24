@@ -8,9 +8,9 @@ import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/int
-import gleam/io
 import gleam/otp/actor
 import gleam/result
+import gleam/string
 import glyph/network/rest
 import glyph/models/decoders
 import glyph/models/discord
@@ -23,7 +23,6 @@ pub type Msg {
   Heartbeat
   Identify
   Resume
-  TimeUpdated(String)
 }
 
 pub type GatewayError {
@@ -37,7 +36,10 @@ pub type ActorState {
     seq: Option(Int),
     heartbeat_in_ms: Int,
     self: process.Subject(Msg),
-    identified: Bool,
+    resume_gateway_url: String,
+    bot_id: discord.Snowflake,
+    handlers: discord.EventHandler,
+    received_hello: Bool,
   )
 }
 
@@ -54,84 +56,173 @@ fn state_to_string(state: ActorState) -> String {
   "STATE: seq: " <> seq <> " heartbeat_in_ms: " <> interval
 }
 
+/// This handles communicating with the gateway based on op codes: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes
 pub fn handle_gateway_recv(
   msg: String,
   state: ActorState,
   conn: stratus.Connection,
-) -> Result(ActorState, GatewayError) {
+) -> ActorState {
   let event =
     json.decode(from: msg, using: decoders.gateway_event_decoder())
     |> result.unwrap(or: fallback_event())
 
   case event.op {
+    // 0 is Dispatch, so most users of this library will want events that will come through this branch
     0 -> {
-      logging.log(logging.Info, "Received Ready event from gateway")
-      let ready = decoders.gateway_ready_decoder(event.d)
+      logging.log(logging.Debug, "Received Dispatch event from gateway")
 
-      case ready {
-        Ok(ev) -> {
-          io.debug(ev)
-          Ok(ActorState(..state, identified: True))
+      let event_type = option.unwrap(event.t, or: "")
+
+      case event_type {
+        "READY" -> {
+          let ready = decoders.gateway_ready_decoder(event.d)
+
+          case ready {
+            Ok(ev) -> {
+              let resume_url =
+                string.replace(ev.resume_gateway_url, "wss", "https")
+              ActorState(
+                ..state,
+                bot_id: ev.user.id,
+                resume_gateway_url: resume_url
+                <> "/?v="
+                <> rest.api_version
+                <> "&encoding=json",
+              )
+            }
+            Error(_) -> {
+              logging.log(logging.Error, "Error parsing Ready event")
+              state
+            }
+          }
         }
-        Error(e) -> {
-          logging.log(logging.Error, "Error parsing Ready event")
-          io.debug(e)
-          Ok(state)
+        "MESSAGE_CREATE" -> {
+          logging.log(logging.Debug, "Handling MESSAGE_CREATE event")
+          let message = decoders.message_decoder(event.d)
+
+          case message {
+            Ok(msg) -> {
+              case msg.author.id == state.bot_id {
+                True -> {
+                  logging.log(logging.Debug, "I think that I am the author")
+                  state
+                }
+                False -> {
+                  logging.log(logging.Debug, "Invoking on_message_create")
+                  let _ = state.handlers.on_message_create(msg)
+                  state
+                }
+              }
+            }
+            Error(_) -> {
+              logging.log(logging.Error, "Error parsing MESSAGE_CREATE event")
+              state
+            }
+          }
+
+          state
+        }
+        "" -> {
+          logging.log(logging.Warning, "Received Dispatch event with no type")
+          state
+        }
+        u -> {
+          logging.log(
+            logging.Warning,
+            "Received Dispatch event with unsupported type: " <> u,
+          )
+          state
         }
       }
     }
     1 -> {
-      logging.log(logging.Info, "Received Heartbeat request from gateway")
+      logging.log(logging.Debug, "Received Heartbeat request from gateway")
 
       let _heartbeat =
         stratus.send_text_message(conn, heartbeat_json(state.seq))
 
-      Ok(state)
+      state
     }
     9 -> {
       logging.log(logging.Warning, "Received Invalid Session from gateway")
 
-      Ok(state)
+      state
     }
     10 -> {
-      logging.log(logging.Info, "Received Hello from gateway")
-      let hello =
-        decoders.gateway_hello_decoder(event.d)
-        |> result.unwrap(or: fallback_hello())
-
-      let jit = jitter(int.to_float(hello.heartbeat_interval))
-      logging.log(logging.Debug, "Jitter value: " <> int.to_string(jit))
-      process.send_after(state.self, jit, Heartbeat)
-
-      Ok(ActorState(..state, heartbeat_in_ms: hello.heartbeat_interval))
-    }
-    11 -> {
-      logging.log(logging.Info, "Received Heartbeat ACK from gateway")
-
-      case state.identified {
-        True -> Ok(state)
+      case state.received_hello {
         False -> {
-          logging.log(logging.Warning, "Not currently identified")
+          logging.log(logging.Debug, "Received Hello from gateway")
+          let hello =
+            decoders.gateway_hello_decoder(event.d)
+            |> result.unwrap(or: fallback_hello())
+
+          let jit = jitter(int.to_float(hello.heartbeat_interval))
+          logging.log(logging.Debug, "Jitter value: " <> int.to_string(jit))
+          process.send_after(state.self, jit, Heartbeat)
           process.send(state.self, Identify)
-          Ok(state)
+
+          ActorState(
+            ..state,
+            heartbeat_in_ms: hello.heartbeat_interval,
+            received_hello: True,
+          )
         }
+        True -> state
       }
     }
+    11 -> {
+      logging.log(logging.Debug, "Received Heartbeat ACK from gateway")
+
+      state
+    }
     -1 -> {
-      logging.log(logging.Warning, "Reached fallback event")
-      Ok(state)
+      logging.log(
+        logging.Warning,
+        "Reached fallback event with " <> state_to_string(state),
+      )
+      state
+    }
+    // The following range of op codes are reasons the gateway closed the connection: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-close-event-codes
+    4008 -> {
+      logging.log(
+        logging.Error,
+        "You have been rate limited for sending too many requests.",
+      )
+      process.send(state.self, Close)
+      state
+    }
+    4013 -> {
+      logging.log(
+        logging.Error,
+        "You sent an invalid intent for a Gateway Intent. You may have incorrectly calculated the bitwise value.",
+      )
+      process.send(state.self, Close)
+      state
+    }
+    4014 -> {
+      logging.log(
+        logging.Error,
+        "You sent a disallowed intent for a Gateway Intent. You may have tried to specify an intent that you have not enabled or are not approved for.",
+      )
+      process.send(state.self, Close)
+      state
     }
     n -> {
       logging.log(
         logging.Warning,
         "Received unexpected op code " <> int.to_string(n),
       )
-      Ok(state)
+      state
     }
   }
 }
 
-pub fn start_ws_loop(discord_token: String, url: String) {
+pub fn start_ws_loop(
+  discord_token: String,
+  intents: Int,
+  url: String,
+  event_handlers: discord.EventHandler,
+) {
   let assert Ok(req) =
     request.to(url <> "/?v=" <> rest.api_version <> "&encoding=json")
 
@@ -148,28 +239,20 @@ pub fn start_ws_loop(discord_token: String, url: String) {
             seq: None,
             heartbeat_in_ms: 0,
             self: subj,
-            identified: False,
+            resume_gateway_url: "",
+            bot_id: "",
+            handlers: event_handlers,
+            received_hello: False,
           ),
           Some(selector),
         )
       },
       loop: fn(msg, state, conn) {
-        // logging.log(logging.Debug, state_to_string(state))
-
         case msg {
           stratus.Text(msg) -> {
             logging.log(logging.Debug, "RECV: " <> msg)
             let new_state = handle_gateway_recv(msg, state, conn)
-            case new_state {
-              Ok(n) -> actor.continue(n)
-              Error(_) -> {
-                logging.log(
-                  logging.Error,
-                  "Encountered error when processing message",
-                )
-                actor.continue(state)
-              }
-            }
+            actor.continue(new_state)
           }
           stratus.User(Heartbeat) -> {
             logging.log(logging.Debug, "Sending heartbeat")
@@ -180,11 +263,10 @@ pub fn start_ws_loop(discord_token: String, url: String) {
           }
           stratus.User(Identify) -> {
             logging.log(logging.Debug, "Sending Identify")
-            logging.log(logging.Debug, identify_json(discord_token, "linux"))
             let _identify =
               stratus.send_text_message(
                 conn,
-                identify_json(discord_token, "linux"),
+                identify_json(discord_token, intents, "linux"),
               )
             actor.continue(state)
           }
@@ -203,26 +285,11 @@ pub fn start_ws_loop(discord_token: String, url: String) {
     |> stratus.on_close(fn(_state) {
       logging.log(logging.Debug, "WebSocket process closing")
     })
+  let assert Ok(_subj) = stratus.initialize(builder)
 
-  let assert Ok(subj) = stratus.initialize(builder)
-
-  process.start(
-    fn() {
-      process.sleep(120_000)
-      stratus.send_message(subj, Close)
-    },
-    True,
-  )
-
-  let _done =
+  let _start =
     process.new_selector()
-    |> process.selecting_process_down(
-      process.monitor_process(process.subject_owner(subj)),
-      function.identity,
-    )
     |> process.select_forever
-
-  logging.log(logging.Debug, "WebSocket process exited")
 }
 
 // Functions for default / fallback objects
@@ -242,7 +309,7 @@ fn heartbeat_json(seq: Option(Int)) -> String {
   |> json.to_string
 }
 
-fn identify_json(token: String, os: String) -> String {
+fn identify_json(token: String, intents: Int, os: String) -> String {
   let properties =
     json.object([
       #("os", json.string(os)),
@@ -254,7 +321,7 @@ fn identify_json(token: String, os: String) -> String {
     #(
       "d",
       json.object([
-        #("intents", json.int(7)),
+        #("intents", json.int(intents)),
         #("token", json.string(token)),
         #("properties", properties),
       ]),
