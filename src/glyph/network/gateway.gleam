@@ -217,12 +217,12 @@ pub fn handle_gateway_recv(
   }
 }
 
-pub fn start_ws_loop(
+pub fn start_gateway_actor(
   discord_token: String,
   intents: Int,
   url: String,
   event_handlers: discord.EventHandler,
-) {
+) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
   let assert Ok(req) =
     request.to(url <> "/?v=" <> rest.api_version <> "&encoding=json")
 
@@ -285,11 +285,8 @@ pub fn start_ws_loop(
     |> stratus.on_close(fn(_state) {
       logging.log(logging.Debug, "WebSocket process closing")
     })
-  let assert Ok(_subj) = stratus.initialize(builder)
 
-  let _start =
-    process.new_selector()
-    |> process.select_forever
+  stratus.initialize(builder)
 }
 
 // Functions for default / fallback objects

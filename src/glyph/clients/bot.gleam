@@ -8,6 +8,12 @@ import glyph/clients/api
 import glyph/models/discord.{type GatewayIntent}
 import glyph/network/gateway
 import glyph/network/rest
+import logging
+
+/// Generic bot error
+pub type BotError {
+  BotError(message: String)
+}
 
 /// Type that contains necessary information when communicating with the Discord API
 pub type BotClient {
@@ -18,7 +24,6 @@ pub type BotClient {
     client_version: String,
     intents: Int,
     handlers: discord.EventHandler,
-    api_client: api.APIClient,
   )
 }
 
@@ -35,19 +40,22 @@ pub fn new(
     client_version: client_version,
     intents: 0,
     handlers: discord.EventHandler(on_message_create: fn(_) { Ok(Nil) }),
-    api_client: api.new(token, client_url, client_version),
   )
+}
+
+/// Initialize a client to begin communication with the gateway
+pub fn initialize(b: BotClient, url: String) {
+  case gateway.start_gateway_actor(b.token, b.intents, url, b.handlers) {
+    Ok(subj) -> Ok(subj)
+    Error(e) -> {
+      Error(BotError(
+        "Encountered error attempting to start gateway: " <> string.inspect(e),
+      ))
+    }
+  }
 }
 
 /// Send a message to a channel
-pub fn send(b: BotClient, channel_id: String, message: String) {
-  api.create_message(
-    b.api_client,
-    channel_id,
-    discord.MessagePayload(content: message),
-  )
-}
-
 /// Converts a GatewayIntent into a bit field
 fn intent_to_bits(intent: GatewayIntent) -> Int {
   case intent {
@@ -86,16 +94,4 @@ pub fn on_message_create(
   callback: fn(discord.Message) -> Result(Nil, discord.DiscordError),
 ) -> BotClient {
   BotClient(..b, handlers: discord.EventHandler(on_message_create: callback))
-}
-
-/// Initialize a client to begin communication with the gateway
-pub fn initialize(b: BotClient) {
-  let ws_url =
-    b.api_client
-    |> api.get_gateway_bot
-    |> result.map(fn(gw_info) { gw_info.url })
-    |> result.unwrap("")
-    |> string.replace(each: "wss", with: "https")
-
-  gateway.start_ws_loop(b.token, b.intents, ws_url, b.handlers)
 }
