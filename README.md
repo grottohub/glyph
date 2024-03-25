@@ -1,4 +1,4 @@
-# glyph
+# Glyph
 
 I am primarily writing this to learn Gleam + the BEAM ecosystem, though I do plan on fully implementing all features.
 
@@ -8,12 +8,9 @@ I _do_ recommend using this if you just want to play around with it and maybe ev
 
 ## Roadmap
 
-Just so you have an idea of what my focus will be the next few weeks:
-- v0.1 - fully implement all gateway events <-- we are here!
-- v0.2 - fully implement the REST client and its payloads (along with tests)
-- v0.3 - start working on shard management, reconnect logic, etc.
+To see what is planned for a certain release, go to the Issues section and filter by Milestone.
 
-[![Package Version](https://img.shields.io/hexpm/v/gliscord)](https://hex.pm/packages/glyph)
+[![Package Version](https://img.shields.io/hexpm/v/glyph)](https://hex.pm/packages/glyph)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/glyph/)
 
 ## Add Glyph to your project
@@ -59,7 +56,7 @@ pub fn main() {
   // Create a new API client and invoke a function
   // Note: the intention for next release is to abstract these behind helper functions in the bot client
   // that way handlers can invoke them
-  let some_channel = "1217259472096067625"
+  let some_channel = "YOUR_CHANNEL_ID"
   let _ =
     api.new(discord_token, "https://github.com/grottohub/glyph", "0.0.1")
     |> api.create_message(some_channel, discord.MessagePayload("I'm alive!"))
