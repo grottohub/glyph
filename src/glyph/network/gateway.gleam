@@ -57,10 +57,11 @@ fn state_to_string(state: ActorState) -> String {
 }
 
 /// This handles communicating with the gateway based on op codes: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes
-pub fn handle_gateway_recv(
+fn handle_gateway_recv(
   msg: String,
   state: ActorState,
   conn: stratus.Connection,
+  bot_subj: process.Subject(rest.RESTMessage),
 ) -> ActorState {
   let event =
     json.decode(from: msg, using: decoders.gateway_event_decoder())
@@ -109,7 +110,7 @@ pub fn handle_gateway_recv(
                 }
                 False -> {
                   logging.log(logging.Debug, "Invoking on_message_create")
-                  let _ = state.handlers.on_message_create(msg)
+                  let _ = state.handlers.on_message_create(bot_subj, msg)
                   state
                 }
               }
@@ -218,27 +219,33 @@ pub fn handle_gateway_recv(
 }
 
 pub fn start_gateway_actor(
+  supervisor_subj: process.Subject(process.Subject(Msg)),
+  bot_subj: process.Subject(rest.RESTMessage),
   discord_token: String,
   intents: Int,
   url: String,
   event_handlers: discord.EventHandler,
 ) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
+  let confirm_https_url = string.replace(url, "wss", "https")
   let assert Ok(req) =
-    request.to(url <> "/?v=" <> rest.api_version <> "&encoding=json")
+    request.to(
+      confirm_https_url <> "/?v=" <> rest.api_version <> "&encoding=json",
+    )
 
   let builder =
     stratus.websocket(
       request: req,
       init: fn() {
-        let subj = process.new_subject()
+        let actor_subj = process.new_subject()
+        process.send(supervisor_subj, actor_subj)
         let selector =
           process.new_selector()
-          |> process.selecting(subj, function.identity)
+          |> process.selecting(actor_subj, function.identity)
         #(
           ActorState(
             seq: None,
             heartbeat_in_ms: 0,
-            self: subj,
+            self: actor_subj,
             resume_gateway_url: "",
             bot_id: "",
             handlers: event_handlers,
@@ -251,7 +258,7 @@ pub fn start_gateway_actor(
         case msg {
           stratus.Text(msg) -> {
             logging.log(logging.Debug, "RECV: " <> msg)
-            let new_state = handle_gateway_recv(msg, state, conn)
+            let new_state = handle_gateway_recv(msg, state, conn, bot_subj)
             actor.continue(new_state)
           }
           stratus.User(Heartbeat) -> {
@@ -272,7 +279,15 @@ pub fn start_gateway_actor(
           }
           stratus.User(Close) -> {
             logging.log(logging.Info, "Closing WebSocket connection")
-            let assert Ok(_) = stratus.close(conn)
+            case stratus.close(conn) {
+              Ok(_) -> Nil
+              Error(e) -> {
+                logging.log(
+                  logging.Error,
+                  "Error closing websocket: " <> string.inspect(e),
+                )
+              }
+            }
             actor.Stop(process.Normal)
           }
           _ -> {
