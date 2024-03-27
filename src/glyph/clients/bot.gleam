@@ -1,13 +1,17 @@
 //// This contains the client with functions specifically made for Bot users.
 
+import gleam/erlang/process.{type Subject}
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
-import glyph/clients/api
+import gleam/otp/supervisor
 import glyph/models/discord.{type GatewayIntent}
-import glyph/network/gateway
-import glyph/network/rest
+import glyph/internal/encoders
+import glyph/internal/decoders
+import glyph/internal/network/gateway
+import glyph/internal/network/rest
 import logging
 
 /// Generic bot error
@@ -27,6 +31,10 @@ pub type BotClient {
   )
 }
 
+/// Subject for the REST actor
+pub type Bot =
+  Subject(rest.RESTMessage)
+
 /// Construct a new BotClient
 pub fn new(
   token: String,
@@ -39,17 +47,54 @@ pub fn new(
     client_url: client_url,
     client_version: client_version,
     intents: 0,
-    handlers: discord.EventHandler(on_message_create: fn(_) { Ok(Nil) }),
+    handlers: discord.EventHandler(on_message_create: fn(_, _) { Ok(Nil) }),
   )
 }
 
-/// Initialize a client to begin communication with the gateway
-pub fn initialize(b: BotClient, url: String) {
-  case gateway.start_gateway_actor(b.token, b.intents, url, b.handlers) {
-    Ok(subj) -> Ok(subj)
+/// Initialize a supervisor that manages the REST and WebSocket processes (aka the bot)
+pub fn initialize(b: BotClient) -> Result(Subject(rest.RESTMessage), BotError) {
+  let rest_subj = process.new_subject()
+  let rest_actor =
+    rest.start_rest_actor(
+      rest_subj,
+      b.token,
+      b.token_type,
+      rest.UserAgent(b.client_url, b.client_version),
+    )
+
+  case rest_actor {
+    Ok(ra) -> {
+      use gateway_info <- result.try(get_gateway_info(ra))
+
+      let supervisor_gateway_subj = process.new_subject()
+      let gateway_actor =
+        supervisor.worker(fn(_) {
+          gateway.start_gateway_actor(
+            supervisor_gateway_subj,
+            ra,
+            b.token,
+            b.intents,
+            gateway_info.url,
+            b.handlers,
+          )
+        })
+
+      case
+        supervisor.start(fn(children) {
+          children
+          |> supervisor.add(gateway_actor)
+        })
+      {
+        Ok(_) -> Ok(ra)
+        Error(e) ->
+          Error(BotError(
+            "Encountered error when starting supervisor: " <> string.inspect(e),
+          ))
+      }
+    }
     Error(e) -> {
       Error(BotError(
-        "Encountered error attempting to start gateway: " <> string.inspect(e),
+        "Encountered error starting REST actor: " <> string.inspect(e),
       ))
     }
   }
@@ -88,10 +133,50 @@ pub fn set_intents(b: BotClient, intents: List(GatewayIntent)) -> BotClient {
   BotClient(..b, intents: intent_bits)
 }
 
+/// Get information for bootstrapping a gateway websocket connection
+fn get_gateway_info(
+  rest_subj: Subject(rest.RESTMessage),
+) -> Result(discord.GetGatewayBot, BotError) {
+  case rest.get(rest_subj, "/gateway/bot", "") {
+    Ok(req_result) -> {
+      case req_result {
+        Ok(resp) -> {
+          resp.body
+          |> json.decode(using: decoders.get_gateway_bot_decoder())
+          |> result.replace_error(BotError("Encountered error decoding JSON"))
+        }
+        Error(e) -> {
+          Error(BotError(
+            "Encountered error sending request: " <> string.inspect(e),
+          ))
+        }
+      }
+    }
+    Error(e) -> {
+      Error(BotError(
+        "Encountered error calling REST process: " <> string.inspect(e),
+      ))
+    }
+  }
+}
+
+/// Send a message to a channel
+pub fn send(
+  s: Subject(rest.RESTMessage),
+  channel_id: String,
+  message: discord.MessagePayload,
+) {
+  let message_json = encoders.message_to_json(message)
+  let endpoint = "/channels/" <> channel_id <> "/messages"
+  logging.log(logging.Debug, "Sending message: " <> message.content)
+
+  let _ = rest.post(s, endpoint, message_json)
+}
+
 /// Register a handler for the MESSAGE_CREATE gateway event
 pub fn on_message_create(
   b: BotClient,
-  callback: fn(discord.Message) -> Result(Nil, discord.DiscordError),
+  callback: fn(Bot, discord.Message) -> Result(Nil, discord.DiscordError),
 ) -> BotClient {
   BotClient(..b, handlers: discord.EventHandler(on_message_create: callback))
 }

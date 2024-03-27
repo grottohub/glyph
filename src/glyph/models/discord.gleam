@@ -1,7 +1,9 @@
 //// This contains all types needed to communicate with either the Gateway or REST API.
 
 import gleam/dynamic
+import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
+import glyph/internal/network/rest.{type RESTMessage}
 
 /// Generic Discord Error
 pub type DiscordError
@@ -155,7 +157,10 @@ pub type GatewayEvent {
 // The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
 
 pub type EventHandler {
-  EventHandler(on_message_create: fn(Message) -> Result(Nil, DiscordError))
+  EventHandler(
+    on_message_create: fn(Subject(RESTMessage), Message) ->
+      Result(Nil, DiscordError),
+  )
 }
 
 /// Structure of a Hello event: https://discord.com/developers/docs/topics/gateway#hello-event
