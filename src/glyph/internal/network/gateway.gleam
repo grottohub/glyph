@@ -11,8 +11,8 @@ import gleam/int
 import gleam/otp/actor
 import gleam/result
 import gleam/string
-import glyph/network/rest
-import glyph/models/decoders
+import glyph/internal/network/rest
+import glyph/internal/decoders
 import glyph/models/discord
 import stratus
 import logging

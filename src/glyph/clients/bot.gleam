@@ -8,10 +8,10 @@ import gleam/result
 import gleam/string
 import gleam/otp/supervisor
 import glyph/models/discord.{type GatewayIntent}
-import glyph/models/encoders
-import glyph/models/decoders
-import glyph/network/gateway
-import glyph/network/rest
+import glyph/internal/encoders
+import glyph/internal/decoders
+import glyph/internal/network/gateway
+import glyph/internal/network/rest
 import logging
 
 /// Generic bot error
@@ -31,7 +31,7 @@ pub type BotClient {
   )
 }
 
-/// Subject for the REST client
+/// Subject for the REST actor
 pub type Bot =
   Subject(rest.RESTMessage)
 
@@ -51,7 +51,7 @@ pub fn new(
   )
 }
 
-/// Initialize a supervisor that manages the REST and WebSocket processes
+/// Initialize a supervisor that manages the REST and WebSocket processes (aka the bot)
 pub fn initialize(b: BotClient) -> Result(Subject(rest.RESTMessage), BotError) {
   let rest_subj = process.new_subject()
   let rest_actor =
@@ -133,6 +133,7 @@ pub fn set_intents(b: BotClient, intents: List(GatewayIntent)) -> BotClient {
   BotClient(..b, intents: intent_bits)
 }
 
+/// Get information for bootstrapping a gateway websocket connection
 fn get_gateway_info(
   rest_subj: Subject(rest.RESTMessage),
 ) -> Result(discord.GetGatewayBot, BotError) {

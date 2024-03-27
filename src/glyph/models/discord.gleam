@@ -3,7 +3,7 @@
 import gleam/dynamic
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
-import glyph/network/rest.{type RESTMessage}
+import glyph/internal/network/rest.{type RESTMessage}
 
 /// Generic Discord Error
 pub type DiscordError
