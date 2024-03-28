@@ -23,9 +23,9 @@ gleam add glyph
 
 ```gleam
 import gleam/io
-import glyph/clients/api
 import glyph/clients/bot
 import glyph/models/discord
+import gleam/erlang/process
 import envoy
 import logging
 
@@ -46,35 +46,38 @@ pub fn main() {
   // stuff above). It's included just to show the debug logging.
   set_logger_level(Level, Debug)
 
-  let discord_token = case envoy.get("DISCORD_TOKEN") {
-    Ok(token) -> token
-    Error(_) -> ""
-  }
+  let assert Ok(discord_token) = envoy.get("DISCORD_TOKEN")
+  let channel_id = "1222877616474820713"
 
   io.println("DISCORD_TOKEN: " <> discord_token)
 
-  // Create a new API client and invoke a function
-  // Note: the intention for next release is to abstract these behind helper functions in the bot client
-  // that way handlers can invoke them
-  let some_channel = "YOUR_CHANNEL_ID"
-  let _ =
-    api.new(discord_token, "https://github.com/grottohub/glyph", "0.0.1")
-    |> api.create_message(some_channel, discord.MessagePayload("I'm alive!"))
-
   // Create a new bot and register its handlers
-  bot.new(discord_token, "https://github.com/grottohub/glyph", "0.0.1")
-  |> bot.set_intents([discord.GuildMessages, discord.MessageContent])
-  |> bot.on_message_create(message_create_callback)
-  |> bot.initialize
+  let assert Ok(bot) =
+    bot.new(discord_token, "https://github.com/grottohub/glyph", "0.0.1")
+    |> bot.set_intents([discord.GuildMessages, discord.MessageContent])
+    |> bot.on_message_create(message_create_callback)
+    |> bot.initialize
+
+  bot.send(bot, channel_id, discord.MessagePayload("I'm alive!"))
+
+  // Wait forever to prevent program termination
+  process.sleep_forever()
 }
 
 pub fn message_create_callback(
+  bot: bot.Bot,
   msg: discord.Message,
 ) -> Result(Nil, discord.DiscordError) {
-  logging.log(logging.Info, "Got: " <> msg.content)
-
-  Ok(Nil)
+  case msg {
+    discord.Message(..) as msg if msg.content == "ping" -> {
+      bot.send(bot, msg.channel_id, discord.MessagePayload("pong!"))
+      Ok(Nil)
+    }
+    _ -> Ok(Nil)
+  }
 }
 ```
 
-Further documentation can be found at <https://hexdocs.pm/glyph>.
+# Documentation
+
+Documentation can be found at <https://hexdocs.pm/glyph>.
