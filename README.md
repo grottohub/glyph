@@ -47,7 +47,7 @@ pub fn main() {
   set_logger_level(Level, Debug)
 
   let assert Ok(discord_token) = envoy.get("DISCORD_TOKEN")
-  let channel_id = "1222877616474820713"
+  let channel_id = "YOUR_CHANNEL_ID"
 
   io.println("DISCORD_TOKEN: " <> discord_token)
 
