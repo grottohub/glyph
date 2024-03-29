@@ -1,4 +1,5 @@
-/// Module for interacting with ETS to store session data
+//// Module for interacting with ETS to store session data
+
 import carpenter/builder
 import carpenter/config/privacy
 import carpenter/table/set

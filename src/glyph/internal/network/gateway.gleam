@@ -41,6 +41,7 @@ pub type ActorState {
     bot_id: discord.Snowflake,
     handlers: discord.EventHandler,
     received_hello: Bool,
+    cache: set.Set(String, String),
   )
 }
 
@@ -62,7 +63,7 @@ fn handle_gateway_recv(
   msg: String,
   state: ActorState,
   conn: stratus.Connection,
-  bot_subj: process.Subject(rest.RESTMessage),
+  bot: discord.BotClient,
 ) -> ActorState {
   let event =
     json.decode(from: msg, using: decoders.gateway_event_decoder())
@@ -111,7 +112,7 @@ fn handle_gateway_recv(
                 }
                 False -> {
                   logging.log(logging.Debug, "Invoking on_message_create")
-                  let _ = state.handlers.on_message_create(bot_subj, msg)
+                  let _ = state.handlers.on_message_create(bot, msg)
                   state
                 }
               }
@@ -221,11 +222,8 @@ fn handle_gateway_recv(
 
 pub fn start_gateway_actor(
   supervisor_subj: process.Subject(process.Subject(Msg)),
-  bot_subj: process.Subject(rest.RESTMessage),
-  discord_token: String,
-  intents: Int,
+  bot: discord.BotClient,
   url: String,
-  event_handlers: discord.EventHandler,
   cache: set.Set(String, String),
 ) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
   let confirm_https_url = string.replace(url, "wss", "https")
@@ -250,8 +248,9 @@ pub fn start_gateway_actor(
             self: actor_subj,
             resume_gateway_url: "",
             bot_id: "",
-            handlers: event_handlers,
+            handlers: bot.handlers,
             received_hello: False,
+            cache: cache,
           ),
           Some(selector),
         )
@@ -260,7 +259,7 @@ pub fn start_gateway_actor(
         case msg {
           stratus.Text(msg) -> {
             logging.log(logging.Debug, "RECV: " <> msg)
-            let new_state = handle_gateway_recv(msg, state, conn, bot_subj)
+            let new_state = handle_gateway_recv(msg, state, conn, bot)
             actor.continue(new_state)
           }
           stratus.User(Heartbeat) -> {
@@ -275,7 +274,7 @@ pub fn start_gateway_actor(
             let _identify =
               stratus.send_text_message(
                 conn,
-                identify_json(discord_token, intents, "linux"),
+                identify_json(bot.token, bot.intents, "linux"),
               )
             actor.continue(state)
           }

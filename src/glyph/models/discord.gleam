@@ -1,9 +1,8 @@
 //// This contains all types needed to communicate with either the Gateway or REST API.
 
 import gleam/dynamic
-import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option}
-import glyph/internal/network/rest.{type RESTMessage}
+import glyph/internal/network/rest
 
 /// Generic Discord Error
 pub type DiscordError
@@ -158,8 +157,7 @@ pub type GatewayEvent {
 
 pub type EventHandler {
   EventHandler(
-    on_message_create: fn(Subject(RESTMessage), Message) ->
-      Result(Nil, DiscordError),
+    on_message_create: fn(BotClient, Message) -> Result(Nil, DiscordError),
   )
 }
 
@@ -202,4 +200,17 @@ pub type GatewayIntent {
   GuildScheduledEvents
   AutoModerationConfiguration
   AutoModerationExecution
+}
+
+/// Type that contains necessary information when communicating with the Discord API
+pub type BotClient {
+  BotClient(
+    token_type: rest.TokenType,
+    token: String,
+    client_url: String,
+    client_version: String,
+    intents: Int,
+    handlers: EventHandler,
+    rest_client: rest.RESTClient,
+  )
 }
