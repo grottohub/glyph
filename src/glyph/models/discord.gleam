@@ -95,6 +95,20 @@ pub type Message {
   )
 }
 
+pub type Message {
+  Message(
+    id: Snowflake,
+    channel_id: Snowflake,
+    author: User,
+    content: String,
+    tts: Bool,
+    mention_everyone: Bool,
+    pinned: Bool,
+    message_type: Int,
+  )
+}
+
+
 /// Model for the payload when creating a message: https://discord.com/developers/docs/resources/channel#create-message
 /// TODO: add remaining fields
 pub type MessagePayload {

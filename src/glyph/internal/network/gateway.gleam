@@ -7,6 +7,7 @@ import gleam/function
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
+import gleam/io.{debug}
 import gleam/int
 import gleam/otp/actor
 import gleam/result
@@ -100,6 +101,11 @@ fn handle_gateway_recv(
         "MESSAGE_CREATE" -> {
           logging.log(logging.Debug, "Handling MESSAGE_CREATE event")
           let message = decoders.message_decoder(event.d)
+
+
+          debug(event)
+          debug(message)
+        
 
           case message {
             Ok(msg) -> {
