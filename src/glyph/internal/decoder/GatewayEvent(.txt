@@ -1,0 +1,48 @@
+GatewayEvent(
+    0, 
+    dict.from_list([
+        #("guild_id", "1222877616474820710"), 
+        #("member", dict.from_list([
+            #("avatar", Null), 
+            #("communication_disabled_until", Null), 
+            #("deaf", False), 
+            #("flags", 0), 
+            #("joined_at", "2024-03-28T11:59:03.744000+00:00"), 
+            #("mute", False), 
+            #("nick", Null), 
+            #("pending", False), 
+            #("premium_since", Null), 
+            #("roles", [])  
+        ])), 
+        #("mentions", []), // duplicated
+
+        #("id", "1223272771224731679"), 
+        #("channel_id", "1222877616474820713"), 
+        #("author", dict.from_list([
+            #("avatar", "88371b0c621af397fb351f73a3206195"), 
+            #("avatar_decoration_data", Null), 
+            #("discriminator", "0"), 
+            #("global_name", "nullpointer"), 
+            #("id", "754041516825247875"), 
+            #("premium_type", 0), 
+            #("public_flags", 0), 
+            #("username", "lucy_phere")
+        ])), 
+        #("content", "Df#"), 
+        #("timestamp", "2024-03-29T14:09:15.969000+00:00"), 
+        #("edited_timestamp", Null), 
+        #("tts", False), 
+        #("mention_everyone", False), 
+
+        #("attachments", []), 
+        #("components", []), 
+        #("embeds", []), 
+        #("flags", 0), 
+        #("mention_roles", []), 
+        #("nonce", "1223272770201190400"), 
+        #("pinned", False), 
+        #("referenced_message", Null), 
+        #("type", 0)]), Some(2), Some("MESSAGE_CREATE"))
+
+
+Ok(Message("1223272771224731679", "1222877616474820713", User("754041516825247875", "lucy_phere", "0", Some("nullpointer"), Some("88371b0c621af397fb351f73a3206195"), None, None, None, None, None, None, None, None, Some(0), Some(0), None), "Df#", False, False, False, 0))
