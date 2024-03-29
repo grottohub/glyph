@@ -17,6 +17,7 @@ import glyph/models/discord
 import stratus
 import logging
 import prng/random.{type Generator}
+import carpenter/table/set
 
 pub type Msg {
   Close
@@ -225,6 +226,7 @@ pub fn start_gateway_actor(
   intents: Int,
   url: String,
   event_handlers: discord.EventHandler,
+  cache: set.Set(String, String),
 ) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
   let confirm_https_url = string.replace(url, "wss", "https")
   let assert Ok(req) =
@@ -336,6 +338,21 @@ fn identify_json(token: String, intents: Int, os: String) -> String {
         #("intents", json.int(intents)),
         #("token", json.string(token)),
         #("properties", properties),
+      ]),
+    ),
+  ])
+  |> json.to_string
+}
+
+fn resume_json(token: String, session_id: String, seq: Option(Int)) -> String {
+  json.object([
+    #("op", json.int(6)),
+    #(
+      "d",
+      json.object([
+        #("token", json.string(token)),
+        #("session_id", json.string(session_id)),
+        #("seq", json.nullable(seq, of: json.int)),
       ]),
     ),
   ])

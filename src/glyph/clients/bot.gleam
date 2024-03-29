@@ -8,6 +8,7 @@ import gleam/result
 import gleam/string
 import gleam/otp/supervisor
 import glyph/models/discord.{type GatewayIntent}
+import glyph/internal/cache
 import glyph/internal/encoders
 import glyph/internal/decoders
 import glyph/internal/network/gateway
@@ -53,6 +54,7 @@ pub fn new(
 
 /// Initialize a supervisor that manages the REST and WebSocket processes (aka the bot)
 pub fn initialize(b: BotClient) -> Result(Subject(rest.RESTMessage), BotError) {
+  let cache = cache.initialize()
   let rest_subj = process.new_subject()
   let rest_actor =
     rest.start_rest_actor(
@@ -76,6 +78,7 @@ pub fn initialize(b: BotClient) -> Result(Subject(rest.RESTMessage), BotError) {
             b.intents,
             gateway_info.url,
             b.handlers,
+            cache,
           )
         })
 
