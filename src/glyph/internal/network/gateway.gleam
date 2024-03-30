@@ -5,7 +5,6 @@ import gleam/erlang/process
 import gleam/float
 import gleam/function
 import gleam/json
-import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/int

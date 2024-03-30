@@ -10,7 +10,7 @@ import gleam/result
 /// Build a new ETS table
 pub fn initialize() -> table.Set(String, String) {
   table.build("glyph_session")
-  |> table.privacy(table.Private)
+  |> table.privacy(table.Public)
   |> table.write_concurrency(table.AutoWriteConcurrency)
   |> table.read_concurrency(False)
   |> table.decentralized_counters(True)
