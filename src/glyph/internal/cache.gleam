@@ -56,3 +56,15 @@ pub fn seq(cache: table.Set(String, String), default: Int) -> Int {
 pub fn session_id(cache: table.Set(String, String), default: String) -> String {
   get(cache, "session_id", default)
 }
+
+/// Whether or not the session had been invalidated by Discord.
+/// A value of "true" will prevent the supervisor from starting 
+/// the actor. This means either we or a Glyph user has misconfigured
+/// something.
+pub fn invalid_session(cache: table.Set(String, String), default: Bool) -> Bool {
+  case get(cache, "invalid_session", "not found") {
+    "true" -> True
+    "false" -> False
+    _ -> default
+  }
+}

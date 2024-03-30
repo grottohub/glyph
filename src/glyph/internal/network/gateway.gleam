@@ -32,6 +32,7 @@ pub type GatewayError {
   DynError(dynamic.DecodeError)
   DynErrors(dynamic.DecodeErrors)
   ActorError(actor.StartError)
+  InvalidSessionError
 }
 
 pub type ActorState {
@@ -43,6 +44,7 @@ pub type ActorState {
     received_hello: Bool,
     heartbeat_in_ms: Int,
     seq: Option(Int),
+    invalid: Bool,
   )
 }
 
@@ -174,11 +176,97 @@ fn handle_gateway_recv(
       state
     }
     // The following range of op codes are reasons the gateway closed the connection: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-close-event-codes
+    4000 -> {
+      logging.log(
+        logging.Error,
+        "An unknown error occurred. Attempting reconnect.",
+      )
+      table.insert(state.session_cache, "should_resume", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4001 -> {
+      logging.log(
+        logging.Error,
+        "You sent an invalid opcode or an invalid payload for an opcode.",
+      )
+      table.insert(state.session_cache, "should_resume", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4002 -> {
+      logging.log(logging.Error, "You sent an invalid payload.")
+      table.insert(state.session_cache, "should_resume", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4003 -> {
+      logging.log(logging.Error, "You sent a payload prior to identifying.")
+      table.insert(state.session_cache, "should_resume", "false")
+      process.send(state.self, Close)
+      state
+    }
+    4004 -> {
+      logging.log(
+        logging.Error,
+        "The account token sent with your identify payload is incorrect.",
+      )
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4005 -> {
+      logging.log(logging.Error, "You send more than one identify payload.")
+      table.insert(state.session_cache, "should_resume", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4007 -> {
+      logging.log(
+        logging.Error,
+        "Invalid sequence sent when resuming the session.",
+      )
+      table.insert(state.session_cache, "should_resume", "false")
+      process.send(state.self, Close)
+      state
+    }
     4008 -> {
       logging.log(
         logging.Error,
         "You have been rate limited for sending too many requests.",
       )
+      table.insert(state.session_cache, "should_resume", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4009 -> {
+      logging.log(logging.Error, "Session timed out.")
+      table.insert(state.session_cache, "should_resume", "false")
+      process.send(state.self, Close)
+      state
+    }
+    4010 -> {
+      logging.log(logging.Error, "You sent an invalid shard when identifying.")
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4011 -> {
+      logging.log(
+        logging.Error,
+        "The session would have handled too many guilds - shard your connection to connect.",
+      )
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
+      process.send(state.self, Close)
+      state
+    }
+    4012 -> {
+      logging.log(logging.Error, "You sent an invalid version for the gateway.")
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
       process.send(state.self, Close)
       state
     }
@@ -187,6 +275,8 @@ fn handle_gateway_recv(
         logging.Error,
         "You sent an invalid intent for a Gateway Intent. You may have incorrectly calculated the bitwise value.",
       )
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
       process.send(state.self, Close)
       state
     }
@@ -195,6 +285,8 @@ fn handle_gateway_recv(
         logging.Error,
         "You sent a disallowed intent for a Gateway Intent. You may have tried to specify an intent that you have not enabled or are not approved for.",
       )
+      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, "invalid_session", "true")
       process.send(state.self, Close)
       state
     }
@@ -233,25 +325,30 @@ pub fn start_gateway_actor(
             received_hello: False,
             heartbeat_in_ms: 0,
             seq: None,
+            invalid: cache.invalid_session(session_cache, False),
           ),
           Some(selector),
         )
       },
       loop: fn(msg, state, conn) {
-        case msg {
-          stratus.Text(msg) -> {
+        case msg, state.invalid {
+          _, True -> {
+            logging.log(logging.Error, "Invalid session, refusing to connect.")
+            actor.continue(state)
+          }
+          stratus.Text(msg), _ -> {
             logging.log(logging.Debug, "RECV: " <> msg)
             let new_state = handle_gateway_recv(msg, state, conn, bot)
             actor.continue(new_state)
           }
-          stratus.User(Heartbeat) -> {
+          stratus.User(Heartbeat), _ -> {
             logging.log(logging.Debug, "Sending heartbeat")
             let _heartbeat =
               stratus.send_text_message(conn, heartbeat_json(state.seq))
             process.send_after(state.self, state.heartbeat_in_ms, Heartbeat)
             actor.continue(state)
           }
-          stratus.User(Identify) -> {
+          stratus.User(Identify), _ -> {
             logging.log(logging.Debug, "Sending Identify")
             let _identify =
               stratus.send_text_message(
@@ -260,7 +357,7 @@ pub fn start_gateway_actor(
               )
             actor.continue(state)
           }
-          stratus.User(Resume) -> {
+          stratus.User(Resume), _ -> {
             logging.log(logging.Debug, "Attempting to resume session")
             let seq = cache.seq(state.session_cache, 0)
             let session_id = cache.session_id(state.session_cache, "")
@@ -272,7 +369,7 @@ pub fn start_gateway_actor(
             table.insert(state.session_cache, "should_resume", "false")
             actor.continue(state)
           }
-          stratus.User(Close) -> {
+          stratus.User(Close), _ -> {
             logging.log(logging.Info, "Closing WebSocket connection")
             case stratus.close(conn) {
               Ok(_) -> Nil
@@ -285,7 +382,7 @@ pub fn start_gateway_actor(
             }
             actor.Stop(process.Normal)
           }
-          _ -> {
+          _, _ -> {
             logging.log(logging.Warning, "Reached unexpected case")
             actor.continue(state)
           }
