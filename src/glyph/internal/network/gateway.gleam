@@ -5,19 +5,21 @@ import gleam/erlang/process
 import gleam/float
 import gleam/function
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/int
 import gleam/otp/actor
 import gleam/result
 import gleam/string
+import glyph/internal/cache
 import glyph/internal/network/rest
 import glyph/internal/decoders
 import glyph/models/discord
 import stratus
 import logging
 import prng/random.{type Generator}
-import carpenter/table/set
+import carpenter/table
 
 pub type Msg {
   Close
@@ -30,32 +32,19 @@ pub type GatewayError {
   JsonError(json.DecodeError)
   DynError(dynamic.DecodeError)
   DynErrors(dynamic.DecodeErrors)
+  ActorError(actor.StartError)
 }
 
 pub type ActorState {
   ActorState(
-    seq: Option(Int),
-    heartbeat_in_ms: Int,
     self: process.Subject(Msg),
-    resume_gateway_url: String,
     bot_id: discord.Snowflake,
     handlers: discord.EventHandler,
+    session_cache: table.Set(String, String),
     received_hello: Bool,
-    cache: set.Set(String, String),
+    heartbeat_in_ms: Int,
+    seq: Option(Int),
   )
-}
-
-fn state_to_string(state: ActorState) -> String {
-  let seq =
-    state.seq
-    |> option.unwrap(or: -1)
-    |> int.to_string
-
-  let interval =
-    state.heartbeat_in_ms
-    |> int.to_string
-
-  "STATE: seq: " <> seq <> " heartbeat_in_ms: " <> interval
 }
 
 /// This handles communicating with the gateway based on op codes: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes
@@ -82,16 +71,9 @@ fn handle_gateway_recv(
 
           case ready {
             Ok(ev) -> {
-              let resume_url =
-                string.replace(ev.resume_gateway_url, "wss", "https")
-              ActorState(
-                ..state,
-                bot_id: ev.user.id,
-                resume_gateway_url: resume_url
-                <> "/?v="
-                <> rest.api_version
-                <> "&encoding=json",
-              )
+              state.session_cache
+              |> table.insert("resume_gateway_url", ev.resume_gateway_url)
+              ActorState(..state, bot_id: ev.user.id)
             }
             Error(_) -> {
               logging.log(logging.Error, "Error parsing Ready event")
@@ -146,6 +128,15 @@ fn handle_gateway_recv(
 
       state
     }
+    7 -> {
+      logging.log(logging.Debug, "Received Reconnect request from gateway")
+
+      state.session_cache
+      |> table.insert("should_resume", "true")
+
+      process.send(state.self, Close)
+      state
+    }
     9 -> {
       logging.log(logging.Warning, "Received Invalid Session from gateway")
 
@@ -162,7 +153,12 @@ fn handle_gateway_recv(
           let jit = jitter(int.to_float(hello.heartbeat_interval))
           logging.log(logging.Debug, "Jitter value: " <> int.to_string(jit))
           process.send_after(state.self, jit, Heartbeat)
-          process.send(state.self, Identify)
+          let should_resume = cache.should_resume(state.session_cache, False)
+
+          case should_resume {
+            True -> process.send(state.self, Resume)
+            False -> process.send(state.self, Identify)
+          }
 
           ActorState(
             ..state,
@@ -176,13 +172,6 @@ fn handle_gateway_recv(
     11 -> {
       logging.log(logging.Debug, "Received Heartbeat ACK from gateway")
 
-      state
-    }
-    -1 -> {
-      logging.log(
-        logging.Warning,
-        "Reached fallback event with " <> state_to_string(state),
-      )
       state
     }
     // The following range of op codes are reasons the gateway closed the connection: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-close-event-codes
@@ -224,17 +213,12 @@ pub fn start_gateway_actor(
   supervisor_subj: process.Subject(process.Subject(Msg)),
   bot: discord.BotClient,
   url: String,
-  cache: set.Set(String, String),
+  session_cache: table.Set(String, String),
 ) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
-  let confirm_https_url = string.replace(url, "wss", "https")
-  let assert Ok(req) =
-    request.to(
-      confirm_https_url <> "/?v=" <> rest.api_version <> "&encoding=json",
-    )
-
+  let init_req = determine_url(session_cache, url)
   let builder =
     stratus.websocket(
-      request: req,
+      request: init_req,
       init: fn() {
         let actor_subj = process.new_subject()
         process.send(supervisor_subj, actor_subj)
@@ -243,14 +227,13 @@ pub fn start_gateway_actor(
           |> process.selecting(actor_subj, function.identity)
         #(
           ActorState(
-            seq: None,
-            heartbeat_in_ms: 0,
             self: actor_subj,
-            resume_gateway_url: "",
             bot_id: "",
             handlers: bot.handlers,
+            session_cache: session_cache,
             received_hello: False,
-            cache: cache,
+            heartbeat_in_ms: 0,
+            seq: None,
           ),
           Some(selector),
         )
@@ -276,6 +259,18 @@ pub fn start_gateway_actor(
                 conn,
                 identify_json(bot.token, bot.intents, "linux"),
               )
+            actor.continue(state)
+          }
+          stratus.User(Resume) -> {
+            logging.log(logging.Debug, "Attempting to resume session")
+            let seq = cache.seq(state.session_cache, 0)
+            let session_id = cache.session_id(state.session_cache, "")
+            let _resume =
+              stratus.send_text_message(
+                conn,
+                resume_json(bot.token, session_id, seq),
+              )
+            table.insert(state.session_cache, "should_resume", "false")
             actor.continue(state)
           }
           stratus.User(Close) -> {
@@ -343,7 +338,7 @@ fn identify_json(token: String, intents: Int, os: String) -> String {
   |> json.to_string
 }
 
-fn resume_json(token: String, session_id: String, seq: Option(Int)) -> String {
+fn resume_json(token: String, session_id: String, seq: Int) -> String {
   json.object([
     #("op", json.int(6)),
     #(
@@ -351,7 +346,7 @@ fn resume_json(token: String, session_id: String, seq: Option(Int)) -> String {
       json.object([
         #("token", json.string(token)),
         #("session_id", json.string(session_id)),
-        #("seq", json.nullable(seq, of: json.int)),
+        #("seq", json.int(seq)),
       ]),
     ),
   ])
@@ -364,4 +359,22 @@ fn jitter(heartbeat_interval: Float) -> Int {
   let gen_jitter: Generator(Float) = random.float(0.0, 1.0)
   { random.random_sample(gen_jitter) *. heartbeat_interval }
   |> float.truncate
+}
+
+fn determine_url(
+  session_cache: table.Set(String, String),
+  url: String,
+) -> request.Request(String) {
+  let resume_url = cache.resume_gateway_url(session_cache, url)
+  let should_resume = cache.should_resume(session_cache, False)
+
+  let base_url = case should_resume {
+    True -> string.replace(resume_url, "wss", "https")
+    False -> string.replace(url, "wss", "https")
+  }
+
+  let assert Ok(init_req) =
+    request.to(base_url <> "/?v=" <> rest.api_version <> "&encoding=json")
+
+  init_req
 }
