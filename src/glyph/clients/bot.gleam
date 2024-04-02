@@ -1,13 +1,13 @@
 //// This contains the client with functions specifically made for Bot users.
 
-import gleam/erlang/process.{type Subject}
+import gleam/erlang/process
 import gleam/int
 import gleam/json
 import gleam/list
 import gleam/result
-import gleam/string
 import gleam/otp/supervisor
-import glyph/models/discord.{type GatewayIntent}
+import glyph/models/discord.{type BotClient, type GatewayIntent}
+import glyph/internal/cache
 import glyph/internal/encoders
 import glyph/internal/decoders
 import glyph/internal/network/gateway
@@ -19,85 +19,50 @@ pub type BotError {
   BotError(message: String)
 }
 
-/// Type that contains necessary information when communicating with the Discord API
-pub type BotClient {
-  BotClient(
-    token_type: rest.TokenType,
-    token: String,
-    client_url: String,
-    client_version: String,
-    intents: Int,
-    handlers: discord.EventHandler,
-  )
-}
-
-/// Subject for the REST actor
-pub type Bot =
-  Subject(rest.RESTMessage)
-
 /// Construct a new BotClient
 pub fn new(
   token: String,
   client_url: String,
   client_version: String,
 ) -> BotClient {
-  BotClient(
+  let rest_client =
+    rest.new(rest.Bot, token, rest.UserAgent(client_url, client_version))
+  discord.BotClient(
     token_type: rest.Bot,
     token: token,
     client_url: client_url,
     client_version: client_version,
     intents: 0,
     handlers: discord.EventHandler(on_message_create: fn(_, _) { Ok(Nil) }),
+    rest_client: rest_client,
   )
 }
 
-/// Initialize a supervisor that manages the REST and WebSocket processes (aka the bot)
-pub fn initialize(b: BotClient) -> Result(Subject(rest.RESTMessage), BotError) {
-  let rest_subj = process.new_subject()
-  let rest_actor =
-    rest.start_rest_actor(
-      rest_subj,
-      b.token,
-      b.token_type,
-      rest.UserAgent(b.client_url, b.client_version),
-    )
+/// Initialize a supervisor that manages the WebSocket process (aka the bot)
+pub fn initialize(bot: BotClient) -> Result(BotClient, BotError) {
+  let cache = cache.initialize()
+  use gateway_info <- result.try(get_gateway_info(bot))
 
-  case rest_actor {
-    Ok(ra) -> {
-      use gateway_info <- result.try(get_gateway_info(ra))
+  let supervisor_gateway_subj = process.new_subject()
+  let gateway_actor =
+    supervisor.worker(fn(_) {
+      gateway.start_gateway_actor(
+        supervisor_gateway_subj,
+        bot,
+        gateway_info.url,
+        cache,
+      )
+    })
 
-      let supervisor_gateway_subj = process.new_subject()
-      let gateway_actor =
-        supervisor.worker(fn(_) {
-          gateway.start_gateway_actor(
-            supervisor_gateway_subj,
-            ra,
-            b.token,
-            b.intents,
-            gateway_info.url,
-            b.handlers,
-          )
-        })
+  use _supervisor_started <- result.try(
+    supervisor.start(fn(children) {
+      children
+      |> supervisor.add(gateway_actor)
+    })
+    |> result.replace_error(BotError("Encountered error starting supervisor")),
+  )
 
-      case
-        supervisor.start(fn(children) {
-          children
-          |> supervisor.add(gateway_actor)
-        })
-      {
-        Ok(_) -> Ok(ra)
-        Error(e) ->
-          Error(BotError(
-            "Encountered error when starting supervisor: " <> string.inspect(e),
-          ))
-      }
-    }
-    Error(e) -> {
-      Error(BotError(
-        "Encountered error starting REST actor: " <> string.inspect(e),
-      ))
-    }
-  }
+  Ok(bot)
 }
 
 /// Send a message to a channel
@@ -130,53 +95,41 @@ fn intent_to_bits(intent: GatewayIntent) -> Int {
 pub fn set_intents(b: BotClient, intents: List(GatewayIntent)) -> BotClient {
   let intent_bits =
     list.fold(intents, b.intents, fn(n, i) { n + intent_to_bits(i) })
-  BotClient(..b, intents: intent_bits)
+  discord.BotClient(..b, intents: intent_bits)
 }
 
 /// Get information for bootstrapping a gateway websocket connection
-fn get_gateway_info(
-  rest_subj: Subject(rest.RESTMessage),
-) -> Result(discord.GetGatewayBot, BotError) {
-  case rest.get(rest_subj, "/gateway/bot", "") {
-    Ok(req_result) -> {
-      case req_result {
-        Ok(resp) -> {
-          resp.body
-          |> json.decode(using: decoders.get_gateway_bot_decoder())
-          |> result.replace_error(BotError("Encountered error decoding JSON"))
-        }
-        Error(e) -> {
-          Error(BotError(
-            "Encountered error sending request: " <> string.inspect(e),
-          ))
-        }
-      }
-    }
-    Error(e) -> {
-      Error(BotError(
-        "Encountered error calling REST process: " <> string.inspect(e),
-      ))
-    }
-  }
+fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
+  use resp <- result.try(
+    rest.get(bot.rest_client, "/gateway/bot", "")
+    |> result.replace_error(BotError("Encountered error when sending request")),
+  )
+
+  use gateway_info <- result.try(
+    resp.body
+    |> json.decode(using: decoders.get_gateway_bot_decoder())
+    |> result.replace_error(BotError("Encountered error when parsing JSON")),
+  )
+
+  Ok(gateway_info)
 }
 
 /// Send a message to a channel
-pub fn send(
-  s: Subject(rest.RESTMessage),
-  channel_id: String,
-  message: discord.MessagePayload,
-) {
+pub fn send(bot: BotClient, channel_id: String, message: discord.MessagePayload) {
   let message_json = encoders.message_to_json(message)
   let endpoint = "/channels/" <> channel_id <> "/messages"
   logging.log(logging.Debug, "Sending message: " <> message.content)
 
-  let _ = rest.post(s, endpoint, message_json)
+  rest.post(bot.rest_client, endpoint, message_json)
 }
 
 /// Register a handler for the MESSAGE_CREATE gateway event
 pub fn on_message_create(
-  b: BotClient,
-  callback: fn(Bot, discord.Message) -> Result(Nil, discord.DiscordError),
+  bot: BotClient,
+  callback: fn(BotClient, discord.Message) -> Result(Nil, discord.DiscordError),
 ) -> BotClient {
-  BotClient(..b, handlers: discord.EventHandler(on_message_create: callback))
+  discord.BotClient(
+    ..bot,
+    handlers: discord.EventHandler(on_message_create: callback),
+  )
 }
