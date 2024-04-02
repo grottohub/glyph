@@ -8,6 +8,7 @@
 //// |> embed.description("Example description")
 //// ```
 
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import glyph/models/discord
 
@@ -171,7 +172,7 @@ pub fn field(
   let new_field =
     discord.EmbedField(name: name, value: value, inline: Some(inline))
 
-  discord.Embed(..e, fields: Some([new_field, ..fields]))
+  discord.Embed(..e, fields: Some(list.append(fields, [new_field])))
 }
 
 /// Set the text for the embed's footer

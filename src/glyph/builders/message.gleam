@@ -57,7 +57,7 @@ pub fn embed(
 ) -> discord.MessagePayload {
   let embeds = option.unwrap(m.embeds, or: [])
 
-  discord.MessagePayload(..m, embeds: Some([e, ..embeds]))
+  discord.MessagePayload(..m, embeds: Some(list.append(embeds, [e])))
 }
 
 /// Sets the message to be a reply to a given Message
