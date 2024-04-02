@@ -19,14 +19,17 @@ To see what is planned for a certain release, go to the Issues section and filte
 gleam add glyph
 ```
 
-## Basic example usage
+## Basic Ping-Pong example
+
+The following code sets up a bot that _replies_ to `!ping` with `Pong!` and `!pong` with `Ping!`.
+
+Note: any code related to the `logging` package below is not necessary, but may help us debug if you encounter issues.
 
 ```gleam
-import gleam/io
+import envoy
+import gleam/erlang/process
 import glyph/clients/bot
 import glyph/models/discord
-import gleam/erlang/process
-import envoy
 import logging
 
 pub type LogLevel {
@@ -42,16 +45,11 @@ fn set_logger_level(log: Log, level: LogLevel) -> Nil
 
 pub fn main() {
   logging.configure()
-  // NOTE:  This isn't strictly necessary at all (including the associated
-  // stuff above). It's included just to show the debug logging.
   set_logger_level(Level, Debug)
 
   let assert Ok(discord_token) = envoy.get("DISCORD_TOKEN")
-  let channel_id = "YOUR_CHANNEL_ID"
   let bot_name = "YOUR_BOT_NAME"
   let bot_version = "YOUR_BOT_VERSION"
-
-  io.println("DISCORD_TOKEN: " <> discord_token)
 
   // Create a new bot and register its handlers
   let assert Ok(bot) =
@@ -60,24 +58,51 @@ pub fn main() {
     |> bot.on_message_create(message_create_callback)
     |> bot.initialize
 
-  bot.send(bot, channel_id, discord.MessagePayload("I'm alive!"))
-
-  // Wait forever to prevent program termination
   process.sleep_forever()
 }
 
-pub fn message_create_callback(
-  bot: bot.Bot,
+fn pong(bot: discord.BotClient, msg: discord.Message) {
+  let response = 
+    message.new()
+    |> message.content("Pong!")
+    |> message.reply_to(msg)
+  
+  let _ = bot.send(bot, msg.channel_id, response)
+
+  Nil
+}
+
+fn ping(bot: discord.BotClient, msg: discord.Message) {
+  let response = 
+    message.new()
+    |> message.content("Ping!")
+    |> message.reply_to(msg)
+  
+  let _ = bot.send(bot, msg.channel_id, response)
+
+  Nil
+}
+
+pub fn message_create_handler(
+  bot: discord.BotClient,
   msg: discord.Message,
 ) -> Result(Nil, discord.DiscordError) {
-  case msg {
-    discord.Message(..) as msg if msg.content == "ping" -> {
-      bot.send(bot, msg.channel_id, discord.MessagePayload("pong!"))
-      Ok(Nil)
-    }
-    _ -> Ok(Nil)
+  case string.starts_with(msg.content, "!ping") {
+    True -> pong(bot, msg)
+    False -> Nil
   }
+
+  case string.starts_with(msg.content, "!pong") {
+    True -> ping(bot, msg)
+    False -> Nil
+  }
+
+  Ok(Nil)
 }
 ```
+
+## Advanced Examples
+
+As I develop Glyph, I will do my best to keep [Scribe](https://github.com/grottohub/scribe/) up to date with examples for all supported features.
 
 Further documentation can be found at <https://hexdocs.pm/glyph>.

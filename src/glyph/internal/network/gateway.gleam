@@ -1,4 +1,4 @@
-//// This handles the logic for communicating with the Discord Gateway API. For more information: https://discord.com/developers/docs/topics/gateway
+//// This handles the logic for communicating with the [Discord Gateway API](https://discord.com/developers/docs/topics/gateway).
 
 import gleam/dynamic
 import gleam/erlang/process

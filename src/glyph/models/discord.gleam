@@ -7,12 +7,13 @@ import glyph/internal/network/rest
 /// Generic Discord Error
 pub type DiscordError
 
-/// The data structure Discord uses for UUIDs: https://discord.com/developers/docs/reference#snowflakes
+/// The [data structure](https://discord.com/developers/docs/reference#snowflakes) Discord uses for UUIDs.
 pub type Snowflake =
   String
 
-/// Model for a Discord Application: https://discord.com/developers/docs/resources/application
-/// Note to self: summary is deprecated and will be removed in v11
+/// Model for a Discord [Application](https://discord.com/developers/docs/resources/application).
+/// 
+/// TODO: summary is deprecated and will be removed in v11
 pub type Application {
   Application(
     id: Snowflake,
@@ -49,7 +50,8 @@ pub type ReadyApplication {
   ReadyApplication(id: Snowflake, flags: Int)
 }
 
-/// Model for a Discord User: https://discord.com/developers/docs/resources/user#user-object
+/// Model for a Discord [User](https://discord.com/developers/docs/resources/user#user-object).
+/// 
 /// Some additional fields marked as optional here due to the use of partial user objects
 /// in other areas of the API.
 pub type User {
@@ -79,7 +81,8 @@ pub type Bot =
 pub type Owner =
   User
 
-/// Model for a Message object: https://discord.com/developers/docs/resources/channel#message-object
+/// Model for a [Message](https://discord.com/developers/docs/resources/channel#message-object) object as received from the gateway.
+/// 
 /// TODO: add remaining fields
 pub type Message {
   Message(
@@ -94,7 +97,8 @@ pub type Message {
   )
 }
 
-/// Model for the payload when creating a message: https://discord.com/developers/docs/resources/channel#create-message
+/// Model for the [payload](https://discord.com/developers/docs/resources/channel#create-message) when creating a message.
+/// 
 /// TODO: message components (will come w/ interactions / commands), files
 pub type MessagePayload {
   MessagePayload(
@@ -110,6 +114,8 @@ pub type MessagePayload {
   )
 }
 
+/// This contains information needed for a `message_reference` attached
+/// to a `MessagePayload`. Needed when replying to a message.
 pub type MessageReference {
   MessageReference(
     message_id: Option(Snowflake),
@@ -119,6 +125,8 @@ pub type MessageReference {
   )
 }
 
+/// This contains information regarding the mentions contained within
+/// a message's content.
 pub type AllowedMentions {
   AllowedMentions(
     parse: List(MentionType),
@@ -128,6 +136,7 @@ pub type AllowedMentions {
   )
 }
 
+/// The supported types of mentions.
 pub type MentionType {
   Roles
   Users
@@ -142,7 +151,8 @@ pub fn mention_type_to_string(m: MentionType) -> String {
   }
 }
 
-/// Model for an embed when creating a message: [source](https://discord.com/developers/docs/resources/channel#embed-object)
+/// Model for an [embed](https://discord.com/developers/docs/resources/channel#embed-object) that can be
+/// attached to a message.
 pub type Embed {
   Embed(
     title: Option(String),
@@ -160,6 +170,7 @@ pub type Embed {
   )
 }
 
+/// Supported information for an embed's footer.
 pub type EmbedFooter {
   EmbedFooter(
     text: String,
@@ -168,6 +179,7 @@ pub type EmbedFooter {
   )
 }
 
+/// The information necessary to send an image with an embed.
 pub type EmbedImage {
   EmbedImage(
     url: String,
@@ -177,6 +189,7 @@ pub type EmbedImage {
   )
 }
 
+/// The information necessary to send a thumbnail with an embed.
 pub type EmbedThumbnail {
   EmbedThumbnail(
     url: String,
@@ -186,6 +199,7 @@ pub type EmbedThumbnail {
   )
 }
 
+/// The information necessary to send a video with an embed.
 pub type EmbedVideo {
   EmbedVideo(
     url: Option(String),
@@ -195,10 +209,12 @@ pub type EmbedVideo {
   )
 }
 
+/// Metadata about the source of the embedded data.
 pub type EmbedProvider {
   EmbedProvider(name: Option(String), url: Option(String))
 }
 
+/// Metadata about the author of the embedded data.
 pub type EmbedAuthor {
   EmbedAuthor(
     name: String,
@@ -208,11 +224,12 @@ pub type EmbedAuthor {
   )
 }
 
+/// Generic fields that can be added to an embed.
 pub type EmbedField {
   EmbedField(name: String, value: String, inline: Option(Bool))
 }
 
-/// Model for a Team object: https://discord.com/developers/docs/topics/teams#data-models-team-object
+/// Model for a [Team](https://discord.com/developers/docs/topics/teams#data-models-team-object) object.
 pub type Team {
   Team(
     id: Snowflake,
@@ -223,12 +240,12 @@ pub type Team {
   )
 }
 
-/// Model for a Team Member object: https://discord.com/developers/docs/topics/teams#data-models-team-member-object
+/// Model for a [Team Member](https://discord.com/developers/docs/topics/teams#data-models-team-member-object) object.
 pub type Member {
   Member(membership_state: Int, team_id: Snowflake, user: User, role: String)
 }
 
-/// Model for Membership State: https://discord.com/developers/docs/topics/teams#data-models-membership-state-enum
+/// Model for [Membership State](https://discord.com/developers/docs/topics/teams#data-models-membership-state-enum).
 pub type MembershipState {
   INVITED
   // -> 1
@@ -236,12 +253,12 @@ pub type MembershipState {
   // -> 2
 }
 
-/// Model for Install Params: https://discord.com/developers/docs/resources/application#install-params-object
+/// Model for [Install Params](https://discord.com/developers/docs/resources/application#install-params-object).
 pub type InstallParams {
   InstallParams(scopes: List(String), permissions: String)
 }
 
-/// Model for Get Gateway Bot: https://discord.com/developers/docs/topics/gateway#get-gateway-bot
+/// Model for the [response](https://discord.com/developers/docs/topics/gateway#get-gateway-bot) received from `/gateway/bot`.
 pub type GetGatewayBot {
   GetGatewayBot(
     url: String,
@@ -250,7 +267,7 @@ pub type GetGatewayBot {
   )
 }
 
-/// Model for Session Start Limit Object: https://discord.com/developers/docs/topics/gateway#session-start-limit-object
+/// Model for [Session Start Limit Object](https://discord.com/developers/docs/topics/gateway#session-start-limit-object).
 pub type SessionStartLimit {
   SessionStartLimit(
     total: Int,
@@ -260,25 +277,27 @@ pub type SessionStartLimit {
   )
 }
 
-/// Structure of payloads between gateway and client: https://discord.com/developers/docs/topics/gateway-events#payload-structure
+/// Top-level structure of [payloads](https://discord.com/developers/docs/topics/gateway-events#payload-structure) between gateway and client.
 pub type GatewayEvent {
   GatewayEvent(op: Int, d: dynamic.Dynamic, s: Option(Int), t: Option(String))
 }
 
-// The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
-
+/// These represent Glyph's supported gateway events and the necessary function signature
+/// for callbacks that get passed in to the `BotClient`.
 pub type EventHandler {
   EventHandler(
     on_message_create: fn(BotClient, Message) -> Result(Nil, DiscordError),
   )
 }
 
-/// Structure of a Hello event: https://discord.com/developers/docs/topics/gateway#hello-event
+// The following are Gateway data models for the data contained within the `d` field of a GatewayEvent
+
+/// Structure of a [Hello](https://discord.com/developers/docs/topics/gateway#hello-event) event.
 pub type HelloEvent {
   HelloEvent(heartbeat_interval: Int)
 }
 
-/// Structure of a Ready event: https://discord.com/developers/docs/topics/gateway-events#ready-ready-event-fields
+/// Structure of a [Ready](https://discord.com/developers/docs/topics/gateway-events#ready-ready-event-fields) event.
 pub type ReadyEvent {
   ReadyEvent(
     v: Int,
@@ -291,7 +310,7 @@ pub type ReadyEvent {
   )
 }
 
-/// The following are gateway intents which represent what events you subscribe to: https://discord.com/developers/docs/topics/gateway#gateway-intents
+/// The following are [gateway intents](https://discord.com/developers/docs/topics/gateway#gateway-intents) which represent what events you subscribe to.
 pub type GatewayIntent {
   Guilds
   GuildMembers

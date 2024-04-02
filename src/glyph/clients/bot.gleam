@@ -64,7 +64,6 @@ pub fn initialize(bot: BotClient) -> Result(BotClient, BotError) {
   Ok(bot)
 }
 
-/// Send a message to a channel
 /// Converts a GatewayIntent into a bit field
 fn intent_to_bits(intent: GatewayIntent) -> Int {
   case intent {
@@ -113,7 +112,10 @@ fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
   Ok(gateway_info)
 }
 
-/// Send a message to a channel
+/// Send a message to a channel.
+/// 
+/// For constructing a message, see [the message builder](https://hexdocs.pm/glyph/glyph/builders/message.html).
+/// For constructing an embed, see [the embed builder](https://hexdocs.pm/glyph/glyph/builders/embed.html).
 pub fn send(bot: BotClient, channel_id: String, message: discord.MessagePayload) {
   let message_json = encoders.message_to_json(message)
   let endpoint = "/channels/" <> channel_id <> "/messages"
@@ -121,7 +123,10 @@ pub fn send(bot: BotClient, channel_id: String, message: discord.MessagePayload)
   rest.post(bot.rest_client, endpoint, message_json)
 }
 
-/// Register a handler for the MESSAGE_CREATE gateway event
+/// Register a handler for the MESSAGE_CREATE gateway event.
+/// 
+/// The callback function must accept a `BotClient` as its first argument,
+/// and is provided a `Message` argument as part of the `MESSAGE_CREATE` event.
 pub fn on_message_create(
   bot: BotClient,
   callback: fn(BotClient, discord.Message) -> Result(Nil, discord.DiscordError),
