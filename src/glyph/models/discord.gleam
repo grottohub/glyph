@@ -95,9 +95,121 @@ pub type Message {
 }
 
 /// Model for the payload when creating a message: https://discord.com/developers/docs/resources/channel#create-message
-/// TODO: add remaining fields
+/// TODO: message components (will come w/ interactions / commands), files
 pub type MessagePayload {
-  MessagePayload(content: String)
+  MessagePayload(
+    content: Option(String),
+    tts: Option(Bool),
+    embeds: Option(List(Embed)),
+    allowed_mentions: Option(AllowedMentions),
+    message_reference: Option(MessageReference),
+    sticker_ids: Option(List(Snowflake)),
+    flags: Option(Int),
+    nonce: Option(String),
+    enforce_nonce: Option(Bool),
+  )
+}
+
+pub type MessageReference {
+  MessageReference(
+    message_id: Option(Snowflake),
+    channel_id: Option(Snowflake),
+    guild_id: Option(Snowflake),
+    fail_if_not_exists: Option(Bool),
+  )
+}
+
+pub type AllowedMentions {
+  AllowedMentions(
+    parse: List(MentionType),
+    roles: List(Snowflake),
+    users: List(Snowflake),
+    replied_user: Bool,
+  )
+}
+
+pub type MentionType {
+  Roles
+  Users
+  Everyone
+}
+
+pub fn mention_type_to_string(m: MentionType) -> String {
+  case m {
+    Roles -> "roles"
+    Users -> "users"
+    Everyone -> "everyone"
+  }
+}
+
+/// Model for an embed when creating a message: [source](https://discord.com/developers/docs/resources/channel#embed-object)
+pub type Embed {
+  Embed(
+    title: Option(String),
+    description: Option(String),
+    url: Option(String),
+    timestamp: Option(String),
+    color: Option(Int),
+    footer: Option(EmbedFooter),
+    image: Option(EmbedImage),
+    thumbnail: Option(EmbedThumbnail),
+    video: Option(EmbedVideo),
+    provider: Option(EmbedProvider),
+    author: Option(EmbedAuthor),
+    fields: Option(List(EmbedField)),
+  )
+}
+
+pub type EmbedFooter {
+  EmbedFooter(
+    text: String,
+    icon_url: Option(String),
+    proxy_icon_url: Option(String),
+  )
+}
+
+pub type EmbedImage {
+  EmbedImage(
+    url: String,
+    proxy_url: Option(String),
+    height: Option(Int),
+    width: Option(Int),
+  )
+}
+
+pub type EmbedThumbnail {
+  EmbedThumbnail(
+    url: String,
+    proxy_url: Option(String),
+    height: Option(Int),
+    width: Option(Int),
+  )
+}
+
+pub type EmbedVideo {
+  EmbedVideo(
+    url: Option(String),
+    proxy_url: Option(String),
+    height: Option(Int),
+    width: Option(Int),
+  )
+}
+
+pub type EmbedProvider {
+  EmbedProvider(name: Option(String), url: Option(String))
+}
+
+pub type EmbedAuthor {
+  EmbedAuthor(
+    name: String,
+    url: Option(String),
+    icon_url: Option(String),
+    proxy_icon_url: Option(String),
+  )
+}
+
+pub type EmbedField {
+  EmbedField(name: String, value: String, inline: Option(Bool))
 }
 
 /// Model for a Team object: https://discord.com/developers/docs/topics/teams#data-models-team-object

@@ -12,7 +12,6 @@ import glyph/internal/encoders
 import glyph/internal/decoders
 import glyph/internal/network/gateway
 import glyph/internal/network/rest
-import logging
 
 /// Generic bot error
 pub type BotError {
@@ -118,7 +117,6 @@ fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
 pub fn send(bot: BotClient, channel_id: String, message: discord.MessagePayload) {
   let message_json = encoders.message_to_json(message)
   let endpoint = "/channels/" <> channel_id <> "/messages"
-  logging.log(logging.Debug, "Sending message: " <> message.content)
 
   rest.post(bot.rest_client, endpoint, message_json)
 }
