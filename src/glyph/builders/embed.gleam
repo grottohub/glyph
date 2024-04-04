@@ -46,8 +46,8 @@ pub fn url(e: discord.Embed, url: String) -> discord.Embed {
 }
 
 /// Set the embed color to one of the available options
-pub fn color(e: discord.Embed, color: EmbedColor) -> discord.Embed {
-  discord.Embed(..e, color: Some(color_to_int(color)))
+pub fn color(e: discord.Embed, color: discord.Color) -> discord.Embed {
+  discord.Embed(..e, color: Some(discord.color_to_decimal(color)))
 }
 
 /// Set the source URL for an image
@@ -209,33 +209,4 @@ fn empty_video() -> discord.EmbedVideo {
 
 fn empty_author() -> discord.EmbedAuthor {
   discord.EmbedAuthor(name: "", url: None, icon_url: None, proxy_icon_url: None)
-}
-
-/// These are the colors of the official Discord palette
-pub type EmbedColor {
-  White
-  Greyple
-  Black
-  DarkButNotBlack
-  NotQuiteBlack
-  Blurple
-  Green
-  Yellow
-  Fuschia
-  Red
-}
-
-fn color_to_int(c: EmbedColor) -> Int {
-  case c {
-    White -> 16_777_215
-    Greyple -> 10_070_709
-    Black -> 23_033_786
-    DarkButNotBlack -> 2_895_667
-    NotQuiteBlack -> 2_303_786
-    Blurple -> 5_793_266
-    Green -> 5_763_719
-    Yellow -> 16_705_372
-    Fuschia -> 15_418_782
-    Red -> 15_548_997
-  }
 }

@@ -1,7 +1,10 @@
 //// This contains all types needed to communicate with either the Gateway or REST API.
 
 import gleam/dynamic
+import gleam/int
 import gleam/option.{type Option}
+import gleam/result.{try}
+import gleam/string
 import glyph/internal/network/rest
 
 /// Generic Discord Error
@@ -344,4 +347,33 @@ pub type BotClient {
     handlers: EventHandler,
     rest_client: rest.RESTClient,
   )
+}
+
+/// Generic color type that is used for some features (such as embeds)
+pub type Color {
+  Color(r: Int, g: Int, b: Int)
+}
+
+/// Attempt to construct a Color from a given hexcode
+pub fn color_from_hex(hex: String) -> Result(Color, Nil) {
+  let dehashed = string.replace(hex, "#", "")
+  use r <- try(
+    string.slice(dehashed, 0, 2)
+    |> int.base_parse(16),
+  )
+  use g <- try(
+    string.slice(dehashed, 2, 2)
+    |> int.base_parse(16),
+  )
+  use b <- try(
+    string.slice(dehashed, 4, 2)
+    |> int.base_parse(16),
+  )
+
+  Ok(Color(r, g, b))
+}
+
+/// Convert a Color into its corresponding decimal value
+pub fn color_to_decimal(c: Color) -> Int {
+  { int.bitwise_shift_left(c.r, 16) } + { int.bitwise_shift_left(c.g, 8) } + c.b
 }
