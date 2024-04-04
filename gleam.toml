@@ -20,6 +20,7 @@ gleam_erlang = "~> 0.24"
 logging = "~> 1.0"
 prng = "~> 3.0"
 carpenter = "~> 0.2"
+gleam_community_colour = "~> 1.4"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"

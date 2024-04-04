@@ -10,6 +10,7 @@
 
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam_community/colour.{type Color}
 import glyph/models/discord
 
 /// Construct a new, empty Embed
@@ -45,9 +46,9 @@ pub fn url(e: discord.Embed, url: String) -> discord.Embed {
   discord.Embed(..e, url: Some(url))
 }
 
-/// Set the embed color to one of the available options
-pub fn color(e: discord.Embed, color: discord.Color) -> discord.Embed {
-  discord.Embed(..e, color: Some(discord.color_to_decimal(color)))
+/// Set the embed color using the gleam_community_colour package
+pub fn color(e: discord.Embed, color: Color) -> discord.Embed {
+  discord.Embed(..e, color: Some(colour.to_rgb_hex(color)))
 }
 
 /// Set the source URL for an image
