@@ -5,14 +5,6 @@ import gleam/dict
 import gleam/option.{type Option}
 import glyph/internal/network/rest
 
-pub type Sub {
-  Sub(id: String, num: Int)
-}
-
-pub type Test {
-  Test(id: String, num: Int, sub: Sub)
-}
-
 /// Generic Discord Error
 pub type DiscordError
 
