@@ -107,7 +107,7 @@ fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
 
   use gateway_info <- result.try(
     resp.body
-    |> json.decode(using: decoders.get_gateway_bot_decoder())
+    |> json.decode(using: decoders.decode_get_gateway_bot)
     |> result.replace_error(BotError("Encountered error when parsing JSON")),
   )
 

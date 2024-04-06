@@ -5,6 +5,7 @@ import gleam/erlang/process
 import gleam/float
 import gleam/function
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/io.{debug}
@@ -57,7 +58,7 @@ fn handle_gateway_recv(
   bot: discord.BotClient,
 ) -> ActorState {
   let event =
-    json.decode(from: msg, using: decoders.gateway_event_decoder())
+    json.decode(from: msg, using: decoders.decode_gateway_event)
     |> result.unwrap(or: fallback_event())
 
   case event.op {
@@ -69,7 +70,7 @@ fn handle_gateway_recv(
 
       case event_type {
         "READY" -> {
-          let ready = decoders.gateway_ready_decoder(event.d)
+          let ready = decoders.decode_ready_event(event.d)
 
           case ready {
             Ok(ev) -> {
@@ -85,12 +86,10 @@ fn handle_gateway_recv(
         }
         "MESSAGE_CREATE" -> {
           logging.log(logging.Debug, "Handling MESSAGE_CREATE event")
-          let message = decoders.message_decoder(event.d)
-
+          let message = decoders.decode_message(event.d)
 
           debug(event)
           debug(message)
-        
 
           case message {
             Ok(msg) -> {
@@ -154,7 +153,7 @@ fn handle_gateway_recv(
         False -> {
           logging.log(logging.Debug, "Received Hello from gateway")
           let hello =
-            decoders.gateway_hello_decoder(event.d)
+            decoders.decode_hello_event(event.d)
             |> result.unwrap(or: fallback_hello())
 
           let jit = jitter(int.to_float(hello.heartbeat_interval))
