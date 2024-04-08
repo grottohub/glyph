@@ -88,9 +88,6 @@ fn handle_gateway_recv(
           logging.log(logging.Debug, "Handling MESSAGE_CREATE event")
           let message = decoders.decode_message(event.d)
 
-          debug(event)
-          debug(message)
-
           case message {
             Ok(msg) -> {
               case msg.author.id == state.bot_id {
