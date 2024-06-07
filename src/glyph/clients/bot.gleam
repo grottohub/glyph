@@ -4,14 +4,16 @@ import gleam/erlang/process
 import gleam/int
 import gleam/json
 import gleam/list
-import gleam/result
 import gleam/otp/supervisor
-import glyph/models/discord.{type BotClient, type GatewayIntent}
+import gleam/result
+import gleam/option.{Some}
 import glyph/internal/cache
-import glyph/internal/encoders
 import glyph/internal/decoders
+import glyph/internal/encoders
 import glyph/internal/network/gateway
 import glyph/internal/network/rest
+import glyph/models/discord.{type BotClient, type GatewayIntent}
+import prng/random.{type Generator}
 
 /// Generic bot error
 pub type BotError {
@@ -112,11 +114,22 @@ fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
   Ok(gateway_info)
 }
 
+fn generate_nonce() -> String {
+  let gen: Generator(String) = random.fixed_size_string(25)
+  random.random_sample(gen)
+}
+
 /// Send a message to a channel.
 /// 
 /// For constructing a message, see [the message builder](https://hexdocs.pm/glyph/glyph/builders/message.html).
 /// For constructing an embed, see [the embed builder](https://hexdocs.pm/glyph/glyph/builders/embed.html).
 pub fn send(bot: BotClient, channel_id: String, message: discord.MessagePayload) {
+  let message =
+    discord.MessagePayload(
+      ..message,
+      nonce: Some(generate_nonce()),
+      enforce_nonce: Some(True),
+    )
   let message_json = encoders.message_to_json(message)
   let endpoint = "/channels/" <> channel_id <> "/messages"
 
