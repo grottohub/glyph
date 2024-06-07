@@ -13,8 +13,6 @@ import glyph/internal/encoders
 import glyph/internal/network/gateway
 import glyph/internal/network/rest
 import glyph/models/discord.{type BotClient, type GatewayIntent}
-import prng/random.{type Generator}
-import prng/seed
 
 /// Generic bot error
 pub type BotError {
