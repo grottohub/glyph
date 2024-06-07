@@ -14,6 +14,7 @@ import glyph/internal/network/gateway
 import glyph/internal/network/rest
 import glyph/models/discord.{type BotClient, type GatewayIntent}
 import prng/random.{type Generator}
+import prng/seed
 
 /// Generic bot error
 pub type BotError {
@@ -115,8 +116,9 @@ fn get_gateway_info(bot: BotClient) -> Result(discord.GetGatewayBot, BotError) {
 }
 
 fn generate_nonce() -> String {
-  let gen: Generator(String) = random.fixed_size_string(25)
-  random.random_sample(gen)
+  random.int(random.min_int, random.max_int)
+  |> random.random_sample
+  |> int.to_string
 }
 
 /// Send a message to a channel.
