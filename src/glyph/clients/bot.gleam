@@ -2,6 +2,7 @@
 
 import gleam/erlang/process
 import gleam/int
+import gleam/string
 import gleam/json
 import gleam/list
 import gleam/otp/supervisor
@@ -13,6 +14,7 @@ import glyph/internal/encoders
 import glyph/internal/network/gateway
 import glyph/internal/network/rest
 import glyph/models/discord.{type BotClient, type GatewayIntent}
+import prng/random
 
 /// Generic bot error
 pub type BotError {
@@ -117,6 +119,7 @@ fn generate_nonce() -> String {
   random.int(random.min_int, random.max_int)
   |> random.random_sample
   |> int.to_string
+  |> string.slice(at_index: 0, length: 25)
 }
 
 /// Send a message to a channel.
