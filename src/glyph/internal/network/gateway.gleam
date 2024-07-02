@@ -1,24 +1,25 @@
 //// This handles the logic for communicating with the [Discord Gateway API](https://discord.com/developers/docs/topics/gateway).
 
+import carpenter/table
 import gleam/dynamic
 import gleam/erlang/process
 import gleam/float
 import gleam/function
-import gleam/json
-import gleam/option.{type Option, None, Some}
 import gleam/http/request
 import gleam/int
+import gleam/io
+import gleam/json
+import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glyph/internal/cache
-import glyph/internal/network/rest
 import glyph/internal/decoders
+import glyph/internal/network/rest
 import glyph/models/discord
-import stratus
 import logging
 import prng/random.{type Generator}
-import carpenter/table
+import stratus
 
 pub type Msg {
   Close
@@ -73,7 +74,7 @@ fn handle_gateway_recv(
           case ready {
             Ok(ev) -> {
               state.session_cache
-              |> table.insert("resume_gateway_url", ev.resume_gateway_url)
+              |> table.insert([#("resume_gateway_url", ev.resume_gateway_url)])
               ActorState(..state, bot_id: ev.user.id)
             }
             Error(_) -> {
@@ -133,7 +134,7 @@ fn handle_gateway_recv(
       logging.log(logging.Debug, "Received Reconnect request from gateway")
 
       state.session_cache
-      |> table.insert("should_resume", "true")
+      |> table.insert([#("should_resume", "true")])
 
       process.send(state.self, Close)
       state
@@ -181,7 +182,7 @@ fn handle_gateway_recv(
         logging.Error,
         "An unknown error occurred. Attempting reconnect.",
       )
-      table.insert(state.session_cache, "should_resume", "true")
+      table.insert(state.session_cache, [#("should_resume", "true")])
       process.send(state.self, Close)
       state
     }
@@ -190,19 +191,19 @@ fn handle_gateway_recv(
         logging.Error,
         "You sent an invalid opcode or an invalid payload for an opcode.",
       )
-      table.insert(state.session_cache, "should_resume", "true")
+      table.insert(state.session_cache, [#("should_resume", "true")])
       process.send(state.self, Close)
       state
     }
     4002 -> {
       logging.log(logging.Error, "You sent an invalid payload.")
-      table.insert(state.session_cache, "should_resume", "true")
+      table.insert(state.session_cache, [#("should_resume", "true")])
       process.send(state.self, Close)
       state
     }
     4003 -> {
       logging.log(logging.Error, "You sent a payload prior to identifying.")
-      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, [#("should_resume", "false")])
       process.send(state.self, Close)
       state
     }
@@ -211,14 +212,16 @@ fn handle_gateway_recv(
         logging.Error,
         "The account token sent with your identify payload is incorrect.",
       )
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
     4005 -> {
       logging.log(logging.Error, "You send more than one identify payload.")
-      table.insert(state.session_cache, "should_resume", "true")
+      table.insert(state.session_cache, [#("should_resume", "true")])
       process.send(state.self, Close)
       state
     }
@@ -227,7 +230,7 @@ fn handle_gateway_recv(
         logging.Error,
         "Invalid sequence sent when resuming the session.",
       )
-      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, [#("should_resume", "false")])
       process.send(state.self, Close)
       state
     }
@@ -236,20 +239,22 @@ fn handle_gateway_recv(
         logging.Error,
         "You have been rate limited for sending too many requests.",
       )
-      table.insert(state.session_cache, "should_resume", "true")
+      table.insert(state.session_cache, [#("should_resume", "true")])
       process.send(state.self, Close)
       state
     }
     4009 -> {
       logging.log(logging.Error, "Session timed out.")
-      table.insert(state.session_cache, "should_resume", "false")
+      table.insert(state.session_cache, [#("should_resume", "false")])
       process.send(state.self, Close)
       state
     }
     4010 -> {
       logging.log(logging.Error, "You sent an invalid shard when identifying.")
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
@@ -258,15 +263,19 @@ fn handle_gateway_recv(
         logging.Error,
         "The session would have handled too many guilds - shard your connection to connect.",
       )
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
     4012 -> {
       logging.log(logging.Error, "You sent an invalid version for the gateway.")
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
@@ -275,8 +284,10 @@ fn handle_gateway_recv(
         logging.Error,
         "You sent an invalid intent for a Gateway Intent. You may have incorrectly calculated the bitwise value.",
       )
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
@@ -285,8 +296,10 @@ fn handle_gateway_recv(
         logging.Error,
         "You sent a disallowed intent for a Gateway Intent. You may have tried to specify an intent that you have not enabled or are not approved for.",
       )
-      table.insert(state.session_cache, "should_resume", "false")
-      table.insert(state.session_cache, "invalid_session", "true")
+      table.insert(state.session_cache, [
+        #("should_resume", "false"),
+        #("invalid_session", "true"),
+      ])
       process.send(state.self, Close)
       state
     }
@@ -306,7 +319,9 @@ pub fn start_gateway_actor(
   url: String,
   session_cache: table.Set(String, String),
 ) -> Result(process.Subject(stratus.InternalMessage(Msg)), actor.StartError) {
-  let init_req = determine_url(session_cache, url)
+  let init_req =
+    determine_url(session_cache, url)
+    |> io.debug
   let builder =
     stratus.websocket(
       request: init_req,
@@ -366,7 +381,7 @@ pub fn start_gateway_actor(
                 conn,
                 resume_json(bot.token, session_id, seq),
               )
-            table.insert(state.session_cache, "should_resume", "false")
+            table.insert(state.session_cache, [#("should_resume", "false")])
             actor.continue(state)
           }
           stratus.User(Close), _ -> {

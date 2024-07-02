@@ -3,12 +3,11 @@
 import carpenter/table
 import gleam/int
 import gleam/list
-import gleam/option
 import gleam/pair
 import gleam/result
 
 /// Build a new ETS table
-pub fn initialize() -> table.Set(String, String) {
+pub fn initialize() -> Result(table.Set(String, String), Nil) {
   table.build("glyph_session")
   |> table.privacy(table.Public)
   |> table.write_concurrency(table.AutoWriteConcurrency)
@@ -22,7 +21,6 @@ pub fn initialize() -> table.Set(String, String) {
 fn get(cache: table.Set(String, String), key: String, default: String) -> String {
   cache
   |> table.lookup(key)
-  |> option.unwrap(or: [#("", default)])
   |> list.first
   |> result.unwrap(or: #("", default))
   |> pair.second

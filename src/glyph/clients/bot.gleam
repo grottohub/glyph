@@ -2,16 +2,17 @@
 
 import gleam/erlang/process
 import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
-import gleam/result
 import gleam/otp/supervisor
-import glyph/models/discord.{type BotClient, type GatewayIntent}
+import gleam/result
 import glyph/internal/cache
-import glyph/internal/encoders
 import glyph/internal/decoders
+import glyph/internal/encoders
 import glyph/internal/network/gateway
 import glyph/internal/network/rest
+import glyph/models/discord.{type BotClient, type GatewayIntent}
 
 /// Generic bot error
 pub type BotError {
@@ -39,7 +40,11 @@ pub fn new(
 
 /// Initialize a supervisor that manages the WebSocket process (aka the bot)
 pub fn initialize(bot: BotClient) -> Result(BotClient, BotError) {
-  let cache = cache.initialize()
+  use cache <- result.try(
+    cache.initialize()
+    |> result.replace_error(BotError("Encountered error initializing cache")),
+  )
+
   use gateway_info <- result.try(get_gateway_info(bot))
 
   let supervisor_gateway_subj = process.new_subject()
